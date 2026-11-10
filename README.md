@@ -5,6 +5,10 @@ cheat-sheet, the full GTFOBins technique database, the 0xsyr0 OSCP cheat sheet,
 and your own reference bookmarks — all searchable from the terminal, with
 progressive help, paged output, and zsh tab-completion.
 
+The tutorial is [howto.html](https://bhupenderbhardwaj83.github.io/oscp/howto.html).
+`oscp howto page` opens the same file on this machine. GitHub Pages publishes
+it from the `main` branch, and the site root opens that page.
+
 > **Scope:** Educational use only. Run the commands here solely against systems
 > you own or are explicitly authorized to test — your own labs, PWK/OSCP lab
 > machines, and the exam environment. Replace the `TARGET` / `LHOST` / `LPORT` /
