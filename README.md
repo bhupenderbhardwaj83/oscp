@@ -187,3 +187,7 @@ no code changes, and tab-completion picks up the new ids/names automatically.
 - `oscp` — shell wrapper (resolves symlinks, so it works from `~/.local/bin`)
 - `completions/_oscp` — standalone zsh completion (alternative to `shell-init`)
 - `data/*.json` — the knowledge base
+
+## License
+
+[MIT](LICENSE). Copyright (c) 2026 Bhupender Bhardwaj.
