@@ -14,24 +14,6 @@ it from the `main` branch, and the site root opens that page.
 > machines, and the exam environment. Replace the `TARGET` / `LHOST` / `LPORT` /
 > `USER` placeholders with your own values before running anything.
 
-## This repository
-
-Everyday git is `oscp atlas git`. The same steps are `bhuppi atlas git`: a new folder, an SSH key or an HTTPS token, remotes, commit, a careful push, clone, and pull requests.
-
-This copy is already a git repository. Do not run `git init` again here. The block GitHub prints for a brand-new repository is:
-
-```bash
-echo "# oscp" >> README.md
-git init
-git add README.md
-git commit -m "first commit"
-git branch -M main
-git remote add origin git@github.com:bhupenderbhardwaj83/oscp.git
-git push -u origin main
-```
-
-Before `git push`, run `git status` and `git diff`. Do not commit a private key, a token, or a password, and do not `git push --force` to `main`. Lab videos, `.env`, and private keys are listed in `.gitignore`.
-
 ## Requirements
 
 - Python 3.8+ (standard library only — no `pip install` needed to run)

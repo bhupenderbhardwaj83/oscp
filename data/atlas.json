@@ -8133,7 +8133,7 @@
     {
       "name": "git",
       "syntax": "git COMMAND [OPTIONS]",
-      "description": "git is the version-control system. The first use cases are everyday work: a new repository, SSH or HTTPS, a commit, and a careful push. The later use cases are for a repository you were given: history often still holds a secret that was removed in a later commit.",
+      "description": "git is the version-control system. The first use cases connect a Mac project to GitHub over SSH: the repository, the author name, the key, the test, and the first push. Later use cases cover HTTPS, pull requests, and a repository you were given, whose history can still hold a secret that was removed in a later commit.",
       "tags": [
         "web",
         "source",
@@ -8162,46 +8162,136 @@
       },
       "usecases": [
         [
-          "Create the folder and the repository",
-          "mkdir oscp && cd oscp && git init -b main",
-          "Creates the directory and a repository whose branch is main. Nothing is uploaded.",
-          "Run this once, in an empty folder. If .git is already there, run git status instead."
+          "Create the GitHub repository",
+          "https://github.com/new",
+          "Sign in at github.com, choose + then New repository, enter a name, choose Private or Public, and click Create repository.",
+          "Leave Add a README, .gitignore, and license unchecked. GitHub then shows an address like git@github.com:bhupenderbhardwaj83/YOUR-REPOSITORY.git."
         ],
         [
-          "Start the repository in this folder",
-          "git init -b main",
-          "Writes .git in the current directory and names the branch main. Nothing is uploaded.",
-          "Run it once. If .git already exists, run git status instead of init."
+          "Check that Git is installed",
+          "git --version",
+          "Prints the Git version. If macOS asks to install Command Line Developer Tools, accept.",
+          "Run this in Terminal on the Mac."
         ],
         [
-          "Make an SSH key",
-          "ssh-keygen -t ed25519 -C \"you@example.com\"",
-          "Writes a private key and a matching .pub file. GitHub accounts use the .pub file.",
-          "Add the .pub under GitHub Settings, SSH and GPG keys. The private key stays on this machine and out of the repository."
+          "Set the commit author name",
+          "git config --global user.name \"bhupenderbhardwaj83\"",
+          "The name that appears on commits from this Mac.",
+          "--global writes it for every repository on this account."
         ],
         [
-          "Load the key, or an SSH certificate",
+          "Set the commit author email",
+          "git config --global user.email \"bhupenderbhardwaj83@gmail.com\"",
+          "The email that appears on those commits.",
+          "Use the email on the GitHub account so the commits link to it."
+        ],
+        [
+          "Create an SSH key on this Mac",
+          "ssh-keygen -t ed25519 -C \"bhupenderbhardwaj83@gmail.com\"",
+          "Writes two files. ~/.ssh/id_ed25519 is the private key and stays on this Mac. ~/.ssh/id_ed25519.pub is the public key you add to GitHub.",
+          "-t ed25519 selects the Ed25519 key type: a short modern key that GitHub accepts. -C sets the comment stored inside the key, here the email, so you can tell this key apart from others. Press Return to accept the default save location. Choose a passphrase when prompted, or press Return for none. Never share or upload the private key."
+        ],
+        [
+          "Start the SSH agent",
+          "eval \"$(ssh-agent -s)\"",
+          "Starts the agent that holds the private key for this terminal session.",
+          "ssh-add talks to this agent."
+        ],
+        [
+          "Load the key into the agent",
           "ssh-add --apple-use-keychain ~/.ssh/id_ed25519",
-          "Gives the terminal the private key so Git can sign in.",
-          "If an organisation gave you id_ed25519-cert.pub, ssh-add that certificate too. A normal GitHub account uses the .pub key, not a certificate."
+          "Gives the agent the private key so Git can sign in.",
+          "--apple-use-keychain stores the passphrase in the macOS keychain and loads the key again after a restart. This loads the private key. It does not upload it."
         ],
         [
-          "Check the SSH login",
+          "Copy the public key",
+          "pbcopy < ~/.ssh/id_ed25519.pub",
+          "Puts the public key on the clipboard.",
+          "The .pub file is the public key. Paste that into GitHub. Never share or upload ~/.ssh/id_ed25519, which is the private key."
+        ],
+        [
+          "Add the public key to GitHub",
+          "https://github.com/settings/keys",
+          "Open your profile picture, then Settings, SSH and GPG keys, New SSH key. Title it, for example My MacBook. Choose Authentication Key. Paste the key and click Add SSH key.",
+          "Paste the clipboard from pbcopy. GitHub may ask you to confirm the account password."
+        ],
+        [
+          "Test the SSH connection",
           "ssh -T git@github.com",
-          "GitHub answers with your username when the key is accepted.",
-          "Hi USER means it worked. Permission denied means the .pub is not on the account, or ssh-add has not loaded the key."
+          "GitHub replies with the account name when the key is accepted.",
+          "At the first connection prompt, type yes. A line that starts with Hi means GitHub recognizes the key. Permission denied means the .pub is not on the account, or ssh-add has not loaded the key."
+        ],
+        [
+          "Move into the project folder",
+          "cd ~/Desktop/my-project",
+          "The commands after this one run inside that project.",
+          "Replace the path with the folder you want to publish."
+        ],
+        [
+          "Initialize the repository",
+          "git init",
+          "Creates .git in the current folder. Nothing is uploaded.",
+          "Run it once. If .git is already there, skip this and run git status."
+        ],
+        [
+          "Stage the project files",
+          "git add .",
+          "Marks the files in this folder for the next commit. It does not upload them.",
+          "Review git status before the commit. Remove any file that contains a password, an API key, or another secret."
+        ],
+        [
+          "Review what will be committed",
+          "git status",
+          "Shows the branch and the files that are staged.",
+          "Run this before every commit and every push. A private key or a .env in this list should be removed, not committed."
+        ],
+        [
+          "Commit the staged files",
+          "git commit -m \"Initial commit\"",
+          "Records the staged snapshot on this Mac. The message says why.",
+          "A commit stays on this Mac until you push."
+        ],
+        [
+          "Name the branch main",
+          "git branch -M main",
+          "Renames the current branch to main.",
+          "-M renames the branch even if main already exists locally."
+        ],
+        [
+          "Connect the GitHub repository",
+          "git remote add origin git@github.com:bhupenderbhardwaj83/oscp.git",
+          "Names that GitHub repository origin, over SSH.",
+          "Replace the address with the SSH address shown on your GitHub repository page. If origin already exists, use git remote set-url origin and that address."
+        ],
+        [
+          "Push main the first time",
+          "git push -u origin main",
+          "Uploads main and remembers origin/main, so a later git push has a destination.",
+          "Do not use --force on main. If the remote has commits you lack, git pull --ff-only origin main, then push again."
+        ],
+        [
+          "Mac SSH walkthrough",
+          "https://www.youtube.com/watch?v=GXcATqdgObU",
+          "Cómo generar y añadir una llave SSH a Github, en Mac, by FixterGeek. Creating an SSH key on a Mac and adding it to GitHub.",
+          "Open the URL. The commands above are the same steps."
+        ],
+        [
+          "GitHub's SSH guide",
+          "https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent",
+          "GitHub's current steps for a new SSH key and the ssh-agent.",
+          "Use this when the GitHub screens have moved."
+        ],
+        [
+          "Create and add an SSH key",
+          "https://www.youtube.com/watch?v=yVP3sYgd0bY",
+          "Create & Add SSH Keys To GitHub For Authentication, by NeuralNine.",
+          "A second walkthrough of the same connection."
         ],
         [
           "HTTPS username and token",
           "git config --global credential.helper osxkeychain",
           "Stores the username and token in the macOS keychain after Git asks once.",
           "On GitHub the password prompt wants a personal access token, not the account password. On Linux use git config --global credential.helper cache. Never put the token in the remote URL."
-        ],
-        [
-          "Add an SSH remote",
-          "git remote add origin git@github.com:bhupenderbhardwaj83/oscp.git",
-          "Names that GitHub repository origin, over SSH.",
-          "One origin only. Replace the path when the repository is not this one. If origin already exists, use git remote set-url."
         ],
         [
           "Add an HTTPS remote",
@@ -8228,46 +8318,10 @@
           "The next push asks for the username and the token if the keychain does not have them."
         ],
         [
-          "Name the branch main",
-          "git branch -M main",
-          "Renames the current branch to main.",
-          "This is the branch name in the block GitHub prints for a new repository."
-        ],
-        [
-          "Start the README",
-          "echo \"# oscp\" >> README.md",
-          "The first line GitHub prints for a new repository.",
-          "The file stays on this machine until you add it and commit it."
-        ],
-        [
-          "Stage the README",
-          "git add README.md",
-          "Marks that file for the next commit. It does not upload it.",
-          "git add . stages every file that is not ignored. Read git status before you do that, so a key or a .env is not included."
-        ],
-        [
-          "Commit the staged files",
-          "git commit -m \"first commit\"",
-          "Records the staged snapshot. The message says why.",
-          "Run git diff --cached first. A commit is local until you push."
-        ],
-        [
-          "See what will be committed",
-          "git status",
-          "Shows the branch, what is staged, and what is not.",
-          "Run this before every commit and every push."
-        ],
-        [
           "Read the unstaged diff",
           "git diff",
           "Shows edits that are not staged yet.",
           "git diff --cached is the staged half. Read both before a commit."
-        ],
-        [
-          "Push main the first time",
-          "git push -u origin main",
-          "Uploads main and remembers origin/main, so later git push has a destination.",
-          "Before this, run git status, git diff, and git log. Do not use --force on main. If the remote has commits you lack, git pull --ff-only origin main, then push."
         ],
         [
           "Push again",
@@ -8443,7 +8497,8 @@
           "Every config value and the file it came from.",
           "A credential.helper or a remote URL with a password is the line to read."
         ]
-      ]
+      ],
+      "docs": "https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent"
     },
     {
       "name": "hashid",
