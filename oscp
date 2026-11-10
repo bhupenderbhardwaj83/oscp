@@ -1,0 +1,20 @@
+#!/bin/sh
+# oscp launcher — runs from oscp's OWN isolated venv so it is independent of the
+# system python and of other tools (ti/tacu, bhuppi). Resolves symlinks so it
+# works when invoked via ~/.local/bin/oscp or ~/.oscp.
+self="$0"
+while [ -h "$self" ]; do
+    link=$(readlink "$self")
+    case "$link" in
+        /*) self="$link" ;;
+        *)  self="$(dirname "$self")/$link" ;;
+    esac
+done
+dir="$(cd "$(dirname "$self")" && pwd)"
+
+venv_py="$HOME/.local/share/oscp/venv/bin/python3"
+if [ -x "$venv_py" ]; then
+    exec "$venv_py" "$dir/oscp.py" "$@"
+fi
+# fallback if the venv is missing (e.g. fresh checkout before setup)
+exec python3 "$dir/oscp.py" "$@"

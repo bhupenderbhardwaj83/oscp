@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Large lab assets (keep out of version control)
+*.mp4
+*.iso
+*.dmg
+*.ovpn
+lab resource/
+
+# Python
+__pycache__/
+*.pyc
+
+# one-off builder scripts
+.scratch/

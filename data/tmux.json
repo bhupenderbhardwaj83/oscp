@@ -1,0 +1,212 @@
+{
+  "meta": {
+    "title": "oscp tmux — this machine's terminal",
+    "note": "Ctrl-a on this page is one custom prefix, chosen for ease. Anyone can set their own. A line that starts with $ is a shell command. A key table is pressed inside tmux, not pasted into the shell.",
+    "flow": "prefix Ctrl-a  →  a key, or Ctrl-a then : for a command"
+  },
+  "sections": [
+    {
+      "id": "config",
+      "name": "The config in ~/.tmux.conf",
+      "goal": "Mouse on, prefix Ctrl-a, 50000 lines of scrollback, logging on Ctrl-a H.",
+      "steps": [
+        ["mouse: click, drag, and scroll", "set -g mouse on"],
+        ["drop the default prefix. unbind is short for unbind-key", "unbind C-b"],
+        ["prefix is Ctrl-a. set is short for set-option", "set -g prefix C-a"],
+        ["Ctrl-a a sends a real Ctrl-a to the program", "bind C-a send-prefix"],
+        ["scrollback lines (default is 2000)", "set -g history-limit 50000"],
+        ["Ctrl-a H toggles the live log", "bind H if-shell -F '#{pane_pipe}' 'pipe-pane ; display-message \"Logging OFF\"' 'pipe-pane -o \"cat >> ~/tmux_live.log 2>/dev/null\" ; display-message \"Logging ON\"'"],
+        ["Ctrl-a C stops logging and empties the file", "bind C pipe-pane \\; run-shell \"> ~/tmux_live.log\" \\; display-message \"Cleared log and forced logging OFF\""],
+        ["reload the file after you edit it. source is the same command", "tmux source-file ~/.tmux.conf"]
+      ],
+      "why": "These six blocks are the whole file. oscp tmux does not rewrite ~/.tmux.conf."
+    },
+    {
+      "id": "logging",
+      "name": "Live log — Ctrl-a H and Ctrl-a C",
+      "goal": "The pane's output is appended to ~/tmux_live.log. One copy. That is the feature.",
+      "steps": [
+        ["turn logging on, or off if it is already on", ""],
+        ["Ctrl-a then H. The status line says Logging ON or Logging OFF.", ""],
+        ["read the log from a different pane or a different terminal", "tail -f ~/tmux_live.log"],
+        ["stop the pipe on this pane from the shell. pipep is the same command", "tmux pipe-pane"],
+        ["Ctrl-a then C: logging off, and the file is emptied", ""],
+        ["Do: turn logging on before the work you want to keep.", ""],
+        ["Do: run ls, shells, and tools in that pane as usual.", ""],
+        ["Do: read ~/tmux_live.log from another pane or another terminal.", ""],
+        ["Do: Ctrl-a H again when you are finished.", ""],
+        ["Don't: cat, tail -f, less, or vim the log in the pane that is logging.", ""],
+        ["Don't: grep the log file from that same pane. ls | grep tmux is fine — it does not print the log.", ""],
+        ["Don't: expect Ctrl-a C to stop a cat that is already running. Ctrl-C first, then Ctrl-a C.", ""]
+      ],
+      "gotcha": "cat ~/tmux_live.log inside the logged pane prints the file, the logger appends that print, and cat prints the new part too. A few commands become tens of megabytes. tail -f in that same pane is the same loop."
+    },
+    {
+      "id": "prefix",
+      "name": "Prefix, then a key or a colon",
+      "goal": "Ctrl-a is the prefix. The next key is a tmux action. Ctrl-a then : opens the command prompt.",
+      "steps": [
+        ["Ctrl-a, then a key from oscp tmux keys.", ""],
+        ["Ctrl-a, then : — type a command, Tab completes, Enter runs it.", ""],
+        ["Ctrl-a, then ? — every key binding.", ""],
+        ["Ctrl-a, then a — send Ctrl-a through to the shell (start of line).", ""]
+      ],
+      "why": "Until ~/.tmux.conf is loaded, the prefix is still Ctrl-b. tmux source-file ~/.tmux.conf makes it Ctrl-a."
+    },
+    {
+      "id": "keys",
+      "name": "Prefix keys (after Ctrl-a)",
+      "goal": "Press Ctrl-a, release, then the key. These are not shell commands.",
+      "table": {
+        "headers": ["After Ctrl-a", "Does"],
+        "rows": [
+          ["d", "detach; the session keeps running"],
+          ["s", "pick a session"],
+          ["$", "rename the session"],
+          ["c", "new window"],
+          ["n  /  p", "next window / previous window"],
+          ["0-9", "jump to that window"],
+          [",", "rename the window"],
+          ["w", "pick a window"],
+          ["&", "kill the window (asks first)"],
+          ["%", "split left and right"],
+          ["\"", "split top and bottom"],
+          ["arrows", "move to another pane"],
+          ["o", "next pane"],
+          [";", "last pane"],
+          ["x", "kill the pane (asks first)"],
+          ["z", "zoom this pane to the full window"],
+          ["space", "next layout"],
+          ["q", "show pane numbers"],
+          ["{", "swap pane with the previous"],
+          ["}", "swap pane with the next"],
+          ["!", "turn this pane into its own window"],
+          ["[", "enter copy mode: scroll, select, copy"],
+          ["]", "paste the tmux buffer into this pane"],
+          [":", "command prompt"],
+          ["?", "list every key"],
+          ["a", "send a real Ctrl-a"],
+          ["H", "logging on or off (this config)"],
+          ["C", "logging off, and empty ~/tmux_live.log (this config)"]
+        ]
+      },
+      "why": "Mouse is on, so clicking a pane, dragging a border, and scrolling the wheel work too."
+    },
+    {
+      "id": "command",
+      "name": "Command prompt — Ctrl-a then :",
+      "goal": "Commands typed after the prefix, then a colon. This config is Ctrl-a, then colon, then the command. Default prefix is Ctrl-b. No parentheses means that command has no short name.",
+      "steps": [
+        ["every command and its short name. lscm is the same command", "tmux list-commands"],
+        ["every key. lsk is the same command", "tmux list-keys"],
+        ["the options this config set. show is the same command", "tmux show-options -g"]
+      ],
+      "table": {
+        "headers": ["Type after Ctrl-a :", "Does"],
+        "rows": [
+          ["list-commands (lscm)", "every command and its short name; Tab completes either"],
+          ["list-keys (lsk)", "every key binding"],
+          ["show-options (show) -g", "mouse, prefix, history-limit"],
+          ["source-file (source) ~/.tmux.conf", "reload the config"],
+          ["new-session (new) -s lab", "start a named session"],
+          ["attach-session (attach) -t lab", "attach to one"],
+          ["detach-client (detach)", "detach"],
+          ["kill-session -t lab", "end that session. No short name"],
+          ["new-window (neww) -n recon", "new window with a name"],
+          ["rename-window (renamew) recon", "rename this window"],
+          ["select-window (selectw) -t 1", "go to window 1"],
+          ["kill-window (killw)", "close this window"],
+          ["split-window (splitw) -h", "split left and right"],
+          ["split-window (splitw) -v", "split top and bottom"],
+          ["select-pane (selectp) -L", "move left (also -R -U -D)"],
+          ["resize-pane (resizep) -L 10", "widen or shrink (also -R -U -D)"],
+          ["swap-pane (swapp) -D", "swap with the next pane"],
+          ["break-pane (breakp)", "this pane becomes its own window"],
+          ["set-window-option (setw) synchronize-panes", "type the same keys into every pane"],
+          ["display-message (display) '#{pane_pipe}'", "empty means logging is off"],
+          ["pipe-pane (pipep)", "stop the live log on this pane"],
+          ["copy-mode", "enter copy mode (same as prefix [). No short name"],
+          ["paste-buffer (pasteb)", "paste the buffer (same as prefix ])"],
+          ["list-buffers (lsb)", "paste buffers, newest first"],
+          ["show-buffer (showb)", "print the newest buffer"],
+          ["save-buffer (saveb) ~/tmux-paste.txt", "write the buffer to a file"],
+          ["load-buffer (loadb) ~/tmux-paste.txt", "read a file into the buffer"],
+          ["set-option (set) -g mode-keys emacs", "copy keys: Ctrl-Space, then Alt-w (the default)"],
+          ["set-option (set) -g mode-keys vi", "copy keys: Space, then Enter"],
+          ["capture-pane (capturep) -S -", "copy all scrollback into the paste buffer"],
+          ["clock-mode", "a clock; q leaves it. No short name"],
+          ["choose-tree", "sessions, windows, and panes in one list. No short name"]
+        ]
+      },
+      "why": "Ctrl-a ? is the key list. list-commands (lscm) is every command. source-file and source are one command, and the same is true of every pair above. The short name works after Ctrl-a : and after tmux in the shell."
+    },
+    {
+      "id": "shell",
+      "name": "The same actions from the shell",
+      "goal": "tmux <command> works outside a session, and inside one. The comment names the other spelling. Either spelling runs.",
+      "steps": [
+        ["full name: new-session", "tmux new -s lab"],
+        ["full name: list-sessions", "tmux ls"],
+        ["full name: attach-session", "tmux attach -t lab"],
+        ["full name: attach-session", "tmux attach"],
+        ["no short name", "tmux kill-session -t lab"],
+        ["no short name", "tmux kill-server"],
+        ["short name: source", "tmux source-file ~/.tmux.conf"],
+        ["short name: source. After Ctrl-a :", "source-file ~/.tmux.conf"],
+        ["short name: pipep", "tmux pipe-pane"],
+        ["short name: capturep", "tmux capture-pane -S - -p > ~/tmux-capture.txt"],
+        ["short name: lsb", "tmux list-buffers"],
+        ["short name: showb", "tmux show-buffer"],
+        ["short name: saveb", "tmux save-buffer ~/tmux-paste.txt"],
+        ["short name: loadb", "tmux load-buffer ~/tmux-paste.txt"],
+        ["short name: pasteb", "tmux paste-buffer"],
+        ["full name: set-option", "tmux set -g mode-keys vi"]
+      ],
+      "why": "source and source-file reload ~/.tmux.conf. New panes pick up the prefix only after that reload. The copied line is one valid command; the comment is the other name."
+    },
+    {
+      "id": "copy",
+      "name": "Copy mode and paste",
+      "goal": "Ctrl-a then [ enters copy mode. You scroll, select, and copy into tmux's paste buffer. Ctrl-a then ] pastes that buffer into the pane.",
+      "steps": [
+        ["1. Enter. Ctrl-a then [. You are no longer typing into the shell.", ""],
+        ["2. Move. Arrows. Ctrl-p and Ctrl-n go up and down. Ctrl-b and Ctrl-f go left and right. PageUp and PageDown. Alt-< is the top of the history, Alt-> the bottom.", ""],
+        ["3. Select. Ctrl-Space starts the selection. Move to the other end. R toggles a rectangle.", ""],
+        ["4. Copy. Alt-w or Ctrl-w copies the selection and leaves copy mode. Ctrl-k copies from the cursor to the end of the line.", ""],
+        ["5. Paste. Ctrl-a then ] inserts the buffer at the cursor.", ""],
+        ["Leave without copying: q, Escape, or Ctrl-c. Ctrl-g drops the selection and stays in copy mode.", ""],
+        ["Search while inside: Ctrl-r up, Ctrl-s down. n repeats, N reverses.", ""],
+        ["Mouse is on: drag to select, release to copy. Double-click a word, triple-click a line. The wheel scrolls.", ""],
+        ["list what was copied. short name: lsb", "tmux list-buffers"],
+        ["print the newest buffer. short name: showb", "tmux show-buffer"],
+        ["write the buffer to a file. short name: saveb", "tmux save-buffer ~/tmux-paste.txt"],
+        ["read a file into the buffer. short name: loadb", "tmux load-buffer ~/tmux-paste.txt"],
+        ["paste from the shell. short name: pasteb", "tmux paste-buffer"],
+        ["optional vi keys. full name: set-option", "tmux set -g mode-keys vi"]
+      ],
+      "table": {
+        "headers": ["Key", "Does"],
+        "rows": [
+          ["Ctrl-a [", "enter copy mode"],
+          ["arrows", "move"],
+          ["Ctrl-p / Ctrl-n", "up / down"],
+          ["Ctrl-b / Ctrl-f", "left / right. Ctrl-b is not the prefix in here"],
+          ["Ctrl-a / Ctrl-e", "start of line / end of line. Ctrl-a is not the prefix in here"],
+          ["PageUp / PageDown", "a page. Space also pages down"],
+          ["Alt-< / Alt->", "top of history / live bottom"],
+          ["Ctrl-Space", "start the selection"],
+          ["R", "rectangle on or off"],
+          ["Alt-w or Ctrl-w", "copy the selection and leave"],
+          ["Ctrl-k", "copy to the end of the line and leave"],
+          ["Ctrl-g", "drop the selection, stay in copy mode"],
+          ["q or Escape or Ctrl-c", "leave without copying"],
+          ["Ctrl-r / Ctrl-s", "search up / search down"],
+          ["n / N", "search again / reverse"],
+          ["Ctrl-a ]", "paste, once you have left copy mode"]
+        ]
+      },
+      "why": "Stock tmux and this config use emacs keys (mode-keys emacs). Space pages down. Selection starts at Ctrl-Space. Vi keys are a setting, set -g mode-keys vi: Space starts the selection and Enter copies. Prefix ] pastes tmux's buffer into the pane. The terminal clipboard is separate: Cmd-V on a Mac, Ctrl-Shift-V in many Linux terminals.",
+      "gotcha": "Alt-w fills the tmux buffer and also asks the terminal to update its clipboard (set-clipboard is external by default). If that clipboard stays empty, Ctrl-a ] still pastes inside the pane, and tmux save-buffer writes a file. history-limit 50000 is how far the scroll goes back."
+    }
+  ]
+}

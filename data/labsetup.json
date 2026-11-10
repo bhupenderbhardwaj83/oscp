@@ -1,0 +1,440 @@
+{
+  "meta": {
+    "title": "oscp lab-setup — Kali on VMware Fusion for OSCP/OSWE/HTB/CTF",
+    "note": "Build a clean Kali attacker box end to end: install, guest tools, update, toolset, snapshot, VPN, MTU — plus the gotchas and fixes. oscp lab-setup <section> to zoom in.",
+    "flow": "vm -> install -> guest-tools -> update -> tools -> snapshot -> vpn -> mtu (tune)"
+  },
+  "sections": [
+    {
+      "id": "vm",
+      "name": "1. Create the VM (Apple Silicon)",
+      "goal": "Pick the right ISO and give the VM enough resources up front.",
+      "steps": [
+        [
+          "Use the Kali ARM64 installer ISO — on Apple Silicon, never the x86-64 ISO",
+          ""
+        ],
+        [
+          "Install from disc or image -> select the ARM64 .iso",
+          ""
+        ],
+        [
+          "No Kali profile? pick 'Linux ARM 64-bit' (e.g. Debian 13 ARM) — a VM compatibility profile, not 'Kali = Debian'",
+          ""
+        ],
+        [
+          "CPU/RAM: 4 cores, 4-8 GB RAM (8 GB if the host can spare it; leave memory for macOS)",
+          ""
+        ],
+        [
+          "Disk: 40 GB minimum, 60 GB+ better — undersized disks cause partitioning failures",
+          ""
+        ],
+        [
+          "Network: 'Share with my Mac' (NAT) — Kali uses the Mac's internet, it is not on the LAN",
+          ""
+        ],
+        [
+          "3D accel: leave default/off; enable only if stable",
+          ""
+        ]
+      ],
+      "why": "NAT is the sensible OSCP default; Bridged exposes Kali on the LAN and Host-only has no internet by itself. Getting disk/RAM right up front avoids a reinstall.",
+      "gotcha": "Wrong-arch ISO won't boot; <40 GB disk -> partitioning errors; Bridged/Host-only -> no internet. The lab's published network requirement overrides NAT."
+    },
+    {
+      "id": "install",
+      "name": "2. Install Kali",
+      "goal": "Complete the guided install and boot clean.",
+      "steps": [
+        [
+          "Boot the installer, complete the guided install",
+          ""
+        ],
+        [
+          "Partitioning fails? fix the disk size first — don't continue on an undersized disk",
+          ""
+        ],
+        [
+          "Eject/disconnect the installer ISO, then boot the virtual disk — or it 'reinstalls' every boot",
+          ""
+        ]
+      ],
+      "why": "Leaving the ISO attached is the classic 'it keeps booting the installer' trap."
+    },
+    {
+      "id": "guest-tools",
+      "name": "3. VMware guest integration (shared folder + clipboard)",
+      "goal": "Shared folders, clipboard and drag-and-drop between macOS and Kali.",
+      "steps": [
+        [
+          "Update first",
+          "sudo apt update && sudo apt full-upgrade -y"
+        ],
+        [
+          "Install guest tools, then reboot",
+          "sudo apt install -y open-vm-tools open-vm-tools-desktop fuse && sudo reboot"
+        ],
+        [
+          "Settings -> Sharing: enable Shared Folders, add the host folder (R/W) — e.g. share name kali-shared",
+          ""
+        ],
+        [
+          "Mount the share",
+          "vmware-hgfsclient ; sudo mkdir -p /mnt/hgfs ; sudo vmhgfs-fuse .host:/ /mnt/hgfs -o allow_other"
+        ],
+        [
+          "Verify",
+          "ls -la /mnt/hgfs/kali-shared/"
+        ],
+        [
+          "Clipboard broken? Isolation: enable Copy/Paste + Drag/Drop, then reinstall + reboot",
+          "sudo apt install --reinstall -y open-vm-tools open-vm-tools-desktop fuse && sudo reboot"
+        ]
+      ],
+      "why": "Shared folders and clipboard are separate VMware features — one can work while the other is broken; the -desktop package + a reboot restores clipboard.",
+      "gotcha": "vmware-hgfsclient lists the share but /mnt/hgfs is empty -> the mount point didn't exist / wasn't mounted. A manual mount may need repeating after reboot (make it persistent or re-run vmhgfs-fuse)."
+    },
+    {
+      "id": "update",
+      "name": "4. Update & upgrade",
+      "goal": "Current packages and a valid keyring.",
+      "steps": [
+        [
+          "Full update",
+          "sudo apt update && sudo apt full-upgrade -y"
+        ],
+        [
+          "Keyring / NO_PUBKEY errors?",
+          "sudo apt install -y kali-archive-keyring && sudo apt update"
+        ],
+        [
+          "Disk full mid-upgrade? (if truly full, you undersized the disk)",
+          "sudo apt clean ; df -h"
+        ]
+      ],
+      "why": "full-upgrade (not plain upgrade) handles Kali's rolling dependency changes; a stale keyring is the usual NO_PUBKEY cause."
+    },
+    {
+      "id": "tools",
+      "name": "5. Install the toolset",
+      "goal": "The OSCP/OSWE/HTB toolkit, installed cleanly.",
+      "steps": [
+        [
+          "Metapackage (or kali-linux-everything, huge)",
+          "sudo apt install -y kali-linux-default"
+        ],
+        [
+          "Core extras",
+          "sudo apt install -y seclists feroxbuster bloodhound netexec ffuf gobuster nmap"
+        ],
+        [
+          "Python tools via pipx (avoids pip PEP-668 errors)",
+          "sudo apt install -y pipx && pipx ensurepath"
+        ],
+        [
+          "Install the Python toolset",
+          "pipx install impacket ; pipx install certipy-ad ; pipx install git+https://github.com/dirkjanm/BloodHound.py"
+        ],
+        [
+          "Pivoting binaries — download chisel + ligolo-ng for Kali AND the target's arch (both ends)",
+          ""
+        ],
+        [
+          "Wordlists",
+          "ls /usr/share/seclists ; sudo gunzip /usr/share/wordlists/rockyou.txt.gz"
+        ],
+        [
+          "Keep winPEAS/linpeas/pspy/mimikatz/Rubeus in ~/tools to serve to targets over HTTP/SMB",
+          ""
+        ]
+      ],
+      "why": "kali-linux-default covers most of it; pipx keeps Python tools isolated and sidesteps the newer 'externally-managed-environment' pip error. Per-tool usage: oscp atlas <tool>.",
+      "gotcha": "System-wide `pip install` now errors (PEP 668) -> use pipx or a venv. rockyou ships gzipped -> gunzip it once."
+    },
+    {
+      "id": "snapshot",
+      "name": "6. Take a baseline snapshot",
+      "goal": "A fast rollback point once everything works.",
+      "steps": [
+        [
+          "Shut Kali down cleanly",
+          ""
+        ],
+        [
+          "Fusion -> Snapshots -> Take Snapshot — name it e.g. Kali-clean-tools-working",
+          ""
+        ],
+        [
+          "Snapshot again before risky installs; restore via Snapshot Manager",
+          ""
+        ]
+      ],
+      "why": "A snapshot is a quick rollback — NOT a backup of your files. Keep loot/notes in the shared folder or off-VM."
+    },
+    {
+      "id": "vpn",
+      "name": "7. Connect to the lab VPN (OffSec / HTB / other)",
+      "goal": "Connect with OpenVPN and verify the tunnel.",
+      "steps": [
+        [
+          "Install OpenVPN",
+          "sudo apt install -y openvpn"
+        ],
+        [
+          "Connect WITH sudo — root is required to create tun0, set its IP and add routes",
+          "sudo openvpn --config ~/Desktop/universal.ovpn"
+        ],
+        [
+          "Wait for the lines: 'TUN/TAP device tun0 opened' then 'Initialization Sequence Completed'",
+          ""
+        ],
+        [
+          "HTB / PG / THM: same, with that platform's pack (keep the terminal open)",
+          "sudo openvpn --config lab.ovpn"
+        ],
+        [
+          "Verify in a second terminal (expect an inet on tun0)",
+          "ip addr show tun0 ; ip route"
+        ],
+        [
+          "AUTH_FAILED or 'Duplicate VPN session Detected'? kill stale clients, wait, reconnect",
+          "sudo pkill openvpn ; sleep 5 ; sudo openvpn --config ~/Desktop/universal.ovpn"
+        ],
+        [
+          "Disconnect with Ctrl-C in the OpenVPN terminal",
+          ""
+        ]
+      ],
+      "why": "MUST run with sudo: without root, OpenVPN cannot open tun0, so there's no tunnel (ifconfig shows no tun0). `sudo openvpn file.ovpn` and `sudo openvpn --config file.ovpn` are identical — a bare filename IS treated as --config; the thing that matters is the sudo, not --config. (No need to chmod +x the .ovpn — it's a config, not a script.) Keep the terminal open while connected; tun0 getting an inet = tunnel up. Use only YOUR profile and keep it private. Connect to ONE lab VPN at a time (route overlap breaks traffic).",
+      "gotcha": "'Duplicate VPN session Detected' / AUTH_FAILED usually means a previous OpenVPN client is still holding a session: `sudo pkill openvpn`, wait ~5 min for OffSec's cooldown, then reconnect with ONLY your current .ovpn. No tun0 at all after 'Peer Connection Initiated' = you forgot sudo. 'Initialization Sequence Completed' means connected, not that routing/DNS work (see the mtu section). Two VPNs / overlapping subnets -> traffic breaks.",
+      "resource": "OffSec Support",
+      "resource_url": "https://help.offsec.com"
+    },
+    {
+      "id": "mtu",
+      "name": "8. VPN up but traffic stalls -> diagnose MTU",
+      "goal": "Find and work around packet-size (MTU) problems.",
+      "steps": [
+        [
+          "Confirm the interface + routes (usually tun0)",
+          "ip -brief link ; ip route"
+        ],
+        [
+          "Check DNS",
+          "getent hosts example.com"
+        ],
+        [
+          "Test packet size (then 1372, 1300, 1200)",
+          "ping -M do -s 1400 1.1.1.1"
+        ],
+        [
+          "Temporary fix — record the original MTU first",
+          "sudo ip link set dev tun0 mtu 1300 ; ip link show tun0"
+        ],
+        [
+          "Same temporary fix with ifconfig — record the original MTU first",
+          "sudo ifconfig tun0 mtu 1250 ; ifconfig tun0"
+        ]
+      ],
+      "why": "A connected VPN doesn't prove all packet sizes/routes/DNS work. Lowering MTU avoids fragmentation / path-MTU black-holes on some paths. 1300 (ip link) and 1250 (ifconfig) are TEST values, not universal — restore the original MTU and check routes/DNS/firewall/profile if it doesn't help. ICMP may be blocked, so a failed ping alone isn't proof."
+    },
+    {
+      "id": "profiles",
+      "name": "9. Best setup per exam / platform",
+      "goal": "One clean base; add context-specific tooling per engagement.",
+      "table": {
+        "headers": [
+          "Context",
+          "Emphasis"
+        ],
+        "rows": [
+          [
+            "OSCP",
+            "NAT, 8 GB RAM; kali-linux-default + impacket/nxc/bloodhound/chisel/seclists; snapshot before the exam"
+          ],
+          [
+            "OSWE",
+            "Burp, source-review tooling, your IDE, more RAM; web/debug focus"
+          ],
+          [
+            "HTB / PG",
+            "that platform's VPN pack; ligolo-ng/chisel; broad tooling (kali-everything optional)"
+          ],
+          [
+            "CTF",
+            "stego/forensics (binwalk/steghide/volatility3), pwntools/gdb/ghidra"
+          ]
+        ]
+      },
+      "why": "Keep the base lean and snapshotted, then branch per engagement — don't rebuild for each."
+    },
+    {
+      "id": "gotchas",
+      "name": "10. Gotchas -> quick fix",
+      "goal": "The common failures and their one-line remediation.",
+      "table": {
+        "headers": [
+          "Symptom",
+          "Fix"
+        ],
+        "rows": [
+          [
+            "VM won't boot",
+            "wrong ISO arch -> use the Kali ARM64 ISO"
+          ],
+          [
+            "Partitioning fails",
+            "disk < 40 GB -> make it bigger and reinstall"
+          ],
+          [
+            "No internet in Kali",
+            "Bridged/Host-only -> switch to NAT (Share with my Mac)"
+          ],
+          [
+            "Shared folder empty",
+            "sudo mkdir -p /mnt/hgfs + vmhgfs-fuse mount"
+          ],
+          [
+            "No copy/paste",
+            "Isolation: enable it + reinstall open-vm-tools-desktop + reboot"
+          ],
+          [
+            "apt NO_PUBKEY",
+            "sudo apt install kali-archive-keyring"
+          ],
+          [
+            "pip 'externally-managed'",
+            "use pipx (or a venv)"
+          ],
+          [
+            "rockyou.txt missing",
+            "sudo gunzip /usr/share/wordlists/rockyou.txt.gz"
+          ],
+          [
+            "VPN up, traffic stalls",
+            "lower tun0 MTU (test) ; check DNS/routes"
+          ],
+          [
+            "VPN won't connect (AUTH_FAILED / 'Duplicate session')",
+            "sudo pkill openvpn ; wait ~5 min ; reconnect with your .ovpn only"
+          ],
+          [
+            "VPN: no tun0 after 'Peer Connection Initiated'",
+            "you forgot sudo -> run openvpn with sudo (root needed for tun0)"
+          ],
+          [
+            "Wi-Fi monitor mode",
+            "needs a USB adapter via the USB menu, NOT the NAT/Bridged NIC"
+          ]
+        ]
+      },
+      "why": "Most lab-setup pain is one of these; fix the cause, then re-snapshot.",
+      "resource": "Wi-Fi on a Mac VM",
+      "resource_url": "oscp technique show wireless-lab-setup-macos"
+    },
+    {
+      "id": "checks",
+      "name": "11. Verify everything",
+      "goal": "Confirm shares, guest tools and networking.",
+      "steps": [
+        [
+          "Shared-folder share names",
+          "vmware-hgfsclient"
+        ],
+        [
+          "Shared folder mounted",
+          "findmnt /mnt/hgfs ; ls -la /mnt/hgfs/"
+        ],
+        [
+          "Guest tools running",
+          "systemctl status open-vm-tools --no-pager"
+        ],
+        [
+          "Interfaces + routes",
+          "ip -brief address ; ip route"
+        ]
+      ],
+      "why": "A 60-second health check after setup (and after each reboot) catches a dropped mount or guest-tools service before it wastes your time."
+    },
+    {
+      "id": "labenv",
+      "name": "12. Lab variables ($ip / $domain / $user) across tabs",
+      "goal": "Persist the current target's IP/domain/creds as shell variables, auto-synced across terminal tabs, with /etc/hosts kept in step.",
+      "steps": [
+        [
+          "Read the shipped helper first — never source shell code you haven't looked at",
+          "less ~/oscp/scripts/labenv.zsh"
+        ],
+        [
+          "Load it from ~/.zshrc (add ONE line yourself), then open a new tab",
+          "echo 'source ~/oscp/scripts/labenv.zsh' >> ~/.zshrc"
+        ],
+        [
+          "Set the target (writes ~/.labenv + updates /etc/hosts)",
+          "setip 10.10.10.25 ; domain dc01.lab.local ; dc dc01.lab.local"
+        ],
+        [
+          "Set creds — AUTHORISED lab creds only; they are stored in plaintext",
+          "user administrator ; password 'LabOnlyPass!'"
+        ],
+        [
+          "Use them straight in commands",
+          "nmap -sVC $ip ; nxc smb $ip -u $user -p $password"
+        ],
+        [
+          "Show / reload / clear",
+          "labinfo ; labreload ; labclear"
+        ],
+        [
+          "Lock the file down",
+          "chmod 600 ~/.labenv"
+        ]
+      ],
+      "table": {
+        "headers": [
+          "Command",
+          "What it does"
+        ],
+        "rows": [
+          [
+            "setip <ip>",
+            "export $ip, save to ~/.labenv, refresh /etc/hosts"
+          ],
+          [
+            "domain <d>",
+            "export $domain, save, map $ip -> $domain in /etc/hosts"
+          ],
+          [
+            "user / password <v>",
+            "primary creds: $user / $password"
+          ],
+          [
+            "dc <host>",
+            "domain-controller host: $dc"
+          ],
+          [
+            "user2/3, password2/3",
+            "extra credential sets"
+          ],
+          [
+            "labinfo",
+            "show current values (passwords masked)"
+          ],
+          [
+            "labreload",
+            "re-source ~/.labenv in this shell now"
+          ],
+          [
+            "labclear",
+            "unset all vars + delete ~/.labenv"
+          ]
+        ]
+      },
+      "why": "Variables persist because each setter WRITES them to ~/.labenv (not just exports them); ~/.zshrc sources that file on every new shell, and a precmd hook re-sources it when another tab changed it — so set the IP once and $ip works in every tab. Using $ip/$user/$password in commands beats retyping them and cuts copy-paste mistakes.",
+      "gotcha": "Plaintext creds in ~/.labenv -> chmod 600 and use lab-only passwords, never real/reused ones (the shipped labinfo masks them on screen). Changing the domain can leave a STALE /etc/hosts line — the shipped script removes the old mapping, but review `tail /etc/hosts` when switching labs. Do NOT add '%sudo ALL=(ALL) NOPASSWD:ALL' just to avoid the sudo prompt on the /etc/hosts write — that's far too broad; keep normal sudo and type your password.",
+      "resource": "hardened helper script",
+      "resource_url": "~/oscp/scripts/labenv.zsh"
+    }
+  ]
+}

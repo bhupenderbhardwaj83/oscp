@@ -1,0 +1,366 @@
+{
+  "meta": {
+    "title": "oscp howto — the phase-by-phase command map",
+    "note": "Which oscp command to run at each stage, in order. The map; the path is: oscp technique show full-workflow",
+    "loop": "recon -> service -> foothold -> stabilise -> enumerate -> escalate -> loot & proof -> report",
+    "setup": "export TARGET=10.10.10.10 ; export LHOST=10.10.14.5   (set once — oscp technique show target-variable)",
+    "metarule": "Stuck 20 min at any phase? You're missing enumeration, not an exploit — drop back a phase. (oscp technique show stuck-checklist)"
+  },
+  "toolmap": {
+    "title": "oscp utility map — which command does what",
+    "note": "How the oscp commands fit together. The kill-chain version (what to run when) is: oscp howto",
+    "flow": [
+      "oscp howto ............ where you are in the exam (recon -> report)",
+      "   │",
+      "   ▼",
+      "oscp technique ........ the path, one technique, or the notes",
+      "   │  one tool                 the short command",
+      "   ▼                           ▼",
+      "oscp atlas <tool>        oscp cmd <category>",
+      "",
+      "then run it:  hacktools · gtfo · search if you do not know which"
+    ],
+    "groups": [
+      {
+        "name": "ORIENT — where do I start?",
+        "items": [
+          [
+            "oscp howto",
+            "the phase map: which command at each stage (recon -> report)"
+          ],
+          [
+            "oscp howto <phase>",
+            "zoom to one phase (recon|service|...|report)"
+          ],
+          [
+            "oscp help <command>",
+            "how that command works"
+          ]
+        ]
+      },
+      {
+        "name": "LEARN — the technique",
+        "items": [
+          [
+            "oscp technique",
+            "three shelves: path, topics, notes"
+          ],
+          [
+            "oscp technique path",
+            "the exam in order"
+          ],
+          [
+            "oscp technique show <id>",
+            "one write-up (a hub, an attack, a notes section)"
+          ],
+          [
+            "oscp atlas <tool>",
+            "one tool in depth: syntax, anatomy, use-cases"
+          ]
+        ]
+      },
+      {
+        "name": "RUN IT",
+        "items": [
+          [
+            "oscp cmd <category>",
+            "the short numbered commands; a line number copies one"
+          ],
+          [
+            "oscp hacktools <category>",
+            "build a payload (revshell, tty, msfvenom, encode)"
+          ],
+          [
+            "oscp gtfo <binary>",
+            "abuse a binary via sudo / suid / capabilities"
+          ],
+          [
+            "oscp search <term>",
+            "find a term when you do not know which command"
+          ]
+        ]
+      },
+      {
+        "name": "KEEP & MANAGE",
+        "items": [
+          [
+            "oscp bm / ref",
+            "your reference links — list, open, add"
+          ],
+          [
+            "oscp lab-setup",
+            "build the Kali box (once)"
+          ],
+          [
+            "oscp setup",
+            "install/upgrade oscp here"
+          ],
+          [
+            "oscp migrate",
+            "package oscp for another machine"
+          ]
+        ]
+      }
+    ],
+    "when": [
+      [
+        "Don't know where to begin",
+        "oscp howto"
+      ],
+      [
+        "How does this command work?",
+        "oscp help <command>"
+      ],
+      [
+        "Which technique, or why this step?",
+        "oscp technique show <id>"
+      ],
+      [
+        "Explain one tool deeply",
+        "oscp atlas <command>"
+      ],
+      [
+        "I need the short command now",
+        "oscp cmd <category>"
+      ],
+      [
+        "Build a payload / encode a string",
+        "oscp hacktools <category>"
+      ],
+      [
+        "Abuse a binary (sudo/suid/caps)",
+        "oscp gtfo <binary>"
+      ],
+      [
+        "I do not know which of those",
+        "oscp search <term>"
+      ],
+      [
+        "Save or open a reference link",
+        "oscp bm"
+      ]
+    ]
+  },
+  "phases": [
+    {
+      "id": "recon",
+      "name": "1. Recon — find every service",
+      "goal": "Full port sweep, then enumerate each service deeply. Map every open port to a plan.",
+      "steps": [
+        [
+          "oscp technique show recon-walkthrough",
+          "exact nmap passes + the port->service->plan table"
+        ],
+        [
+          "oscp atlas nmap",
+          "tool reference (also: rustscan, masscan, autorecon)"
+        ],
+        [
+          "oscp cmd recon",
+          "recon cheat-sheet category"
+        ],
+        [
+          "oscp cmd dns",
+          "if 53 is open"
+        ]
+      ],
+      "next": "service",
+      "resource": "SecLists (wordlists)",
+      "resource_url": "https://github.com/danielmiessler/SecLists"
+    },
+    {
+      "id": "service",
+      "name": "2. Service — attack what's open",
+      "goal": "Pick the plan for each open port; test every input until something gives a way in.",
+      "steps": [
+        [
+          "oscp technique show attack-http",
+          "80/443 -> wordpress / php-apache / react branches"
+        ],
+        [
+          "oscp technique show attack-ftp",
+          "21"
+        ],
+        [
+          "oscp technique show attack-ssh",
+          "22"
+        ],
+        [
+          "oscp technique show attack-smb",
+          "139/445"
+        ],
+        [
+          "oscp technique show attack-rdp-winrm",
+          "3389 / 5985"
+        ],
+        [
+          "oscp technique show attack-databases",
+          "3306 / 1433 / 5432 / 6379 / 27017"
+        ],
+        [
+          "oscp technique show web-methodology",
+          "the source->sink bug-hunting mindset"
+        ],
+        [
+          "oscp cmd web   ·   oscp cmd smb   ·   oscp cmd services",
+          "quick cheat-sheets"
+        ]
+      ],
+      "next": "foothold",
+      "resource": "PayloadsAllTheThings",
+      "resource_url": "https://github.com/swisskyrepo/PayloadsAllTheThings"
+    },
+    {
+      "id": "foothold",
+      "name": "3. Foothold — turn the bug into a shell",
+      "goal": "Start a listener, fire a reverse shell in the target's language, and catch it.",
+      "steps": [
+        [
+          "oscp technique show foothold-logic",
+          "the full webshell -> reverse-shell flow"
+        ],
+        [
+          "oscp hacktools listener 4444",
+          "start the catcher FIRST"
+        ],
+        [
+          "oscp hacktools revshell $LHOST 4444",
+          "pick a reverse shell (LHOST filled in)"
+        ],
+        [
+          "oscp hacktools php   ·   oscp hacktools windows   ·   oscp hacktools msfvenom",
+          "by target type"
+        ],
+        [
+          "oscp cmd shells",
+          "shells cheat-sheet"
+        ]
+      ],
+      "next": "stabilise",
+      "resource": "RevShells.com (revshell generator)",
+      "resource_url": "https://www.revshells.com/"
+    },
+    {
+      "id": "stabilise",
+      "name": "4. Stabilise — get a real TTY",
+      "goal": "Upgrade the dumb shell so you have job control, history and arrow keys.",
+      "steps": [
+        [
+          "oscp technique show shell-tty",
+          "the python-pty + stty raw upgrade, step by step"
+        ],
+        [
+          "oscp atlas rlwrap   ·   oscp atlas pwncat-cs",
+          "nicer shell handling"
+        ]
+      ],
+      "next": "enumerate",
+      "resource": "RevShells.com (TTY/shell tips)",
+      "resource_url": "https://www.revshells.com/"
+    },
+    {
+      "id": "enumerate",
+      "name": "5. Enumerate — local recon as the new user",
+      "goal": "Grab the first flag, run the enumerator, hunt and reuse credentials.",
+      "steps": [
+        [
+          "oscp technique show post-foothold-enum",
+          "the first 10 minutes on a box"
+        ],
+        [
+          "oscp technique show linux-enum-checklist",
+          "or: windows-privesc-checklist"
+        ],
+        [
+          "oscp atlas linpeas   ·   oscp atlas winpeas",
+          "the automated enumerator"
+        ],
+        [
+          "oscp technique show creds-hunting",
+          "find creds, then reuse them everywhere"
+        ],
+        [
+          "oscp hacktools transfer $LHOST $LPORT linpeas.sh",
+          "get tools onto the box"
+        ]
+      ],
+      "next": "escalate",
+      "resource": "GTFOBins / LOLBAS",
+      "resource_url": "https://gtfobins.github.io/   ·   https://lolbas-project.github.io/"
+    },
+    {
+      "id": "escalate",
+      "name": "6. Escalate — root / SYSTEM",
+      "goal": "Map each enumeration finding to the technique that escalates it.",
+      "steps": [
+        [
+          "oscp technique show privesc-linux-path",
+          "finding -> technique decision tree"
+        ],
+        [
+          "oscp technique show privesc-windows-path",
+          "the Windows equivalent"
+        ],
+        [
+          "oscp gtfo <binary>",
+          "sudo / suid / capability abuse by binary"
+        ],
+        [
+          "oscp cmd privesc-linux   ·   oscp cmd privesc-windows   ·   oscp cmd ad",
+          "cheat-sheets"
+        ]
+      ],
+      "next": "proof",
+      "resource": "GTFOBins & LOLBAS",
+      "resource_url": "https://gtfobins.github.io/   ·   https://lolbas-project.github.io/"
+    },
+    {
+      "id": "proof",
+      "name": "7. Loot & proof — capture and pivot",
+      "goal": "Prove each flag properly, loot credentials, and pivot to any further hosts.",
+      "steps": [
+        [
+          "oscp technique show flags-and-proof",
+          "local.txt/proof.txt + whoami+ip screenshot + submit"
+        ],
+        [
+          "oscp cmd creds",
+          "dump and crack what you find"
+        ],
+        [
+          "oscp cmd pivot",
+          "reach deeper hosts (chisel / ligolo / ssh tunnels)"
+        ],
+        [
+          "oscp technique show ssh-tunneling-patterns",
+          "-L / -R / -D decoded"
+        ]
+      ],
+      "next": "report",
+      "resource": "HackTricks (checklists)",
+      "resource_url": "https://book.hacktricks.xyz/"
+    },
+    {
+      "id": "report",
+      "name": "8. Report — the write-up that scores",
+      "goal": "A reproducible per-machine report. Points come from the report, not the shell.",
+      "steps": [
+        [
+          "oscp technique show report-writing",
+          "structure + what each machine section needs"
+        ],
+        [
+          "oscp technique show note-taking-reporting",
+          "how to take notes as you go"
+        ],
+        [
+          "oscp technique show oscp-exam-strategy",
+          "exam: time, scoring, the 15-min rule"
+        ]
+      ],
+      "next": null,
+      "resource": "OffSec report template",
+      "resource_url": "https://www.offsec.com/pwk-online/OSCP-Exam-Report.docx"
+    }
+  ]
+}

