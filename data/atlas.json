@@ -8133,7 +8133,7 @@
     {
       "name": "git",
       "syntax": "git COMMAND [OPTIONS]",
-      "description": "git is the version-control system; for offsec you use it to mine an exposed or looted repository — the full history often holds secrets 'removed' in a later commit.",
+      "description": "git is the version-control system. The first use cases are everyday work: a new repository, SSH or HTTPS, a commit, and a careful push. The later use cases are for a repository you were given: history often still holds a secret that was removed in a later commit.",
       "tags": [
         "web",
         "source",
@@ -8161,6 +8161,186 @@
         "why": "A fast, distributed version-control system built to manage the kernel's history."
       },
       "usecases": [
+        [
+          "Create the folder and the repository",
+          "mkdir oscp && cd oscp && git init -b main",
+          "Creates the directory and a repository whose branch is main. Nothing is uploaded.",
+          "Run this once, in an empty folder. If .git is already there, run git status instead."
+        ],
+        [
+          "Start the repository in this folder",
+          "git init -b main",
+          "Writes .git in the current directory and names the branch main. Nothing is uploaded.",
+          "Run it once. If .git already exists, run git status instead of init."
+        ],
+        [
+          "Make an SSH key",
+          "ssh-keygen -t ed25519 -C \"you@example.com\"",
+          "Writes a private key and a matching .pub file. GitHub accounts use the .pub file.",
+          "Add the .pub under GitHub Settings, SSH and GPG keys. The private key stays on this machine and out of the repository."
+        ],
+        [
+          "Load the key, or an SSH certificate",
+          "ssh-add --apple-use-keychain ~/.ssh/id_ed25519",
+          "Gives the terminal the private key so Git can sign in.",
+          "If an organisation gave you id_ed25519-cert.pub, ssh-add that certificate too. A normal GitHub account uses the .pub key, not a certificate."
+        ],
+        [
+          "Check the SSH login",
+          "ssh -T git@github.com",
+          "GitHub answers with your username when the key is accepted.",
+          "Hi USER means it worked. Permission denied means the .pub is not on the account, or ssh-add has not loaded the key."
+        ],
+        [
+          "HTTPS username and token",
+          "git config --global credential.helper osxkeychain",
+          "Stores the username and token in the macOS keychain after Git asks once.",
+          "On GitHub the password prompt wants a personal access token, not the account password. On Linux use git config --global credential.helper cache. Never put the token in the remote URL."
+        ],
+        [
+          "Add an SSH remote",
+          "git remote add origin git@github.com:bhupenderbhardwaj83/oscp.git",
+          "Names that GitHub repository origin, over SSH.",
+          "One origin only. Replace the path when the repository is not this one. If origin already exists, use git remote set-url."
+        ],
+        [
+          "Add an HTTPS remote",
+          "git remote add origin https://github.com/bhupenderbhardwaj83/oscp.git",
+          "Names the same repository origin, over HTTPS.",
+          "Git then asks for the username and the token. Do not add a second remote also named origin."
+        ],
+        [
+          "Show the remotes",
+          "git remote -v",
+          "Prints the fetch and push URL of every remote.",
+          "git@github.com is SSH. https://github.com is HTTPS."
+        ],
+        [
+          "Point origin at SSH",
+          "git remote set-url origin git@github.com:bhupenderbhardwaj83/oscp.git",
+          "Changes an existing origin to SSH.",
+          "Run git remote -v afterwards. This does not upload anything."
+        ],
+        [
+          "Point origin at HTTPS",
+          "git remote set-url origin https://github.com/bhupenderbhardwaj83/oscp.git",
+          "Changes an existing origin to HTTPS.",
+          "The next push asks for the username and the token if the keychain does not have them."
+        ],
+        [
+          "Name the branch main",
+          "git branch -M main",
+          "Renames the current branch to main.",
+          "This is the branch name in the block GitHub prints for a new repository."
+        ],
+        [
+          "Start the README",
+          "echo \"# oscp\" >> README.md",
+          "The first line GitHub prints for a new repository.",
+          "The file stays on this machine until you add it and commit it."
+        ],
+        [
+          "Stage the README",
+          "git add README.md",
+          "Marks that file for the next commit. It does not upload it.",
+          "git add . stages every file that is not ignored. Read git status before you do that, so a key or a .env is not included."
+        ],
+        [
+          "Commit the staged files",
+          "git commit -m \"first commit\"",
+          "Records the staged snapshot. The message says why.",
+          "Run git diff --cached first. A commit is local until you push."
+        ],
+        [
+          "See what will be committed",
+          "git status",
+          "Shows the branch, what is staged, and what is not.",
+          "Run this before every commit and every push."
+        ],
+        [
+          "Read the unstaged diff",
+          "git diff",
+          "Shows edits that are not staged yet.",
+          "git diff --cached is the staged half. Read both before a commit."
+        ],
+        [
+          "Push main the first time",
+          "git push -u origin main",
+          "Uploads main and remembers origin/main, so later git push has a destination.",
+          "Before this, run git status, git diff, and git log. Do not use --force on main. If the remote has commits you lack, git pull --ff-only origin main, then push."
+        ],
+        [
+          "Push again",
+          "git push",
+          "Uploads the current branch to the upstream set by -u.",
+          "Still read git status first. --force-with-lease is only for a branch whose history you rewrote. Never --force main."
+        ],
+        [
+          "Clone over SSH",
+          "git clone git@github.com:bhupenderbhardwaj83/oscp.git",
+          "Copies the repository into a new folder, history included.",
+          "Needs the SSH key. Clone into an empty directory, not on top of work you want to keep."
+        ],
+        [
+          "Clone over HTTPS",
+          "git clone https://github.com/bhupenderbhardwaj83/oscp.git",
+          "The same copy, over HTTPS.",
+          "Git asks for the username and the token when the keychain does not have them."
+        ],
+        [
+          "Open a pull request",
+          "gh pr create --title \"first commit\" --body \"What changed and why.\"",
+          "Opens a pull request for the branch you just pushed.",
+          "Push the branch first. gh auth login once, if gh does not know the account yet."
+        ],
+        [
+          "Start from someone else's repository",
+          "gh repo fork OWNER/REPO --clone",
+          "Copies their repository to your GitHub account and clones that copy here.",
+          "Commit on a new branch. Push to your fork. Do not push to their main."
+        ],
+        [
+          "Ask them to merge your branch",
+          "gh pr create --repo OWNER/REPO --title \"Describe the change\" --body \"What changed and why.\"",
+          "Opens the pull request on their repository, from the branch on your fork.",
+          "The branch has to be pushed first. They review it and merge it. You do not merge their main yourself."
+        ],
+        [
+          "See pull requests on your repository",
+          "gh pr list",
+          "Lists pull requests other people have opened.",
+          "A public repository already accepts pull requests from forks. On a private repository, invite the person under Settings, Collaborators, with Write, so they can push a branch."
+        ],
+        [
+          "Check out their pull request",
+          "gh pr checkout NUMBER",
+          "Puts their branch in your work tree so you can read it and run it.",
+          "NUMBER is the one gh pr list printed."
+        ],
+        [
+          "Merge their pull request",
+          "gh pr merge NUMBER --merge",
+          "Merges that pull request into your default branch.",
+          "Read gh pr diff NUMBER first. --squash and --rebase are the other merge styles."
+        ],
+        [
+          "Recent commits",
+          "git log --oneline -15",
+          "The last 15 commits, one line each.",
+          "Read this before a push so you know what will go up."
+        ],
+        [
+          "Debug the SSH login",
+          "ssh -vT git@github.com",
+          "Prints the SSH conversation, including which key was offered.",
+          "Stop at the error line. Do not paste a private key from the output."
+        ],
+        [
+          "Debug a push",
+          "GIT_TRACE=1 git push",
+          "Prints what Git did during the push.",
+          "For HTTPS, GIT_CURL_VERBOSE=1 git ls-remote origin. Do not paste a token from that output."
+        ],
         [
           "Review an exposed repo",
           "git log --oneline",
@@ -8210,12 +8390,6 @@
           "Deep recovery."
         ],
         [
-          "Status",
-          "git status",
-          "What changed in this repo.",
-          "Run it in the directory git-dumper created, or any repo you were given."
-        ],
-        [
           "Log with patches",
           "git log -p --all",
           "Every branch, with diffs.",
@@ -8238,12 +8412,6 @@
           "git log -S 'password' --oneline",
           "Commits that added or removed the string password.",
           "Then git show that commit."
-        ],
-        [
-          "Remotes",
-          "git remote -v",
-          "Where this repo pushes.",
-          "A credential in a remote URL is a secret."
         ],
         [
           "Reflog",

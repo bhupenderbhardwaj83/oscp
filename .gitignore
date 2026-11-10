@@ -14,3 +14,16 @@ __pycache__/
 
 # one-off builder scripts
 .scratch/
+
+# secrets — never push these
+.env
+.env.*
+.labenv
+*.pem
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+id_ecdsa
+id_ed25519-cert.pub
+*.keystore
